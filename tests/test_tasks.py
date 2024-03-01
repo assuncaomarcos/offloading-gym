@@ -3,15 +3,15 @@
 """ Tests the task parser and task graphs """
 
 import unittest
-from offloading_gym.task_graph import Task, TaskGraph
-from offloading_gym.workload import graph
+from offloading_gym.task_graph import Task, TaskGraph, parse_dot, daggen_graph
 import networkx as nx
+import random
 
 class TestTaskParser(unittest.TestCase):
     """Tests the task parser."""
 
     def setUp(self) -> None:
-        pass
+        random.seed(42)
 
     def tearDown(self) -> None:
         pass
@@ -23,20 +23,23 @@ class TestTaskParser(unittest.TestCase):
     #         print(t)
 
     def test_graph_parser(self):
-        task_graph = dot_parser.parse_dot("tests/samples/task_graph.gv")
+        task_graph = parse_dot("tests/samples/task_graph.gv")
         number_tasks = len(task_graph.tasks)
         self.assertEqual(number_tasks, 20)
-        for task in task_graph.tasks.values():
-            print(task)
-
-        for edge in task_graph.edges.values():
-            print(edge)
+        # for task in task_graph.tasks.values():
+        #     print(task)
+        #
+        # for edge in task_graph.edges.values():
+        #     print(edge)
 
         # self.assertEqual(task_graph.max_datasize, 170280960)
         # self.assertEqual(task_graph.min_datasize, 5270528)
         # self.assertEqual(task_graph.tasks[0].proc_datasize, 162501973)
         # self.assertEqual(task_graph.tasks[0].trans_datasize, 48750592)
         # self.assertEqual(task_graph.tasks[14].depth, 3)
+
+    def test_daggen_graph(self):
+        daggen_graph(num_tasks=10)
     #
     # @staticmethod
     # def _normalize_datasize(datasize, task_graph):
