@@ -3,3 +3,4 @@ gymnasium>=0.29.1
 numpy>=1.16.3
 networkx~=3.2.1
 pygraphviz~=1.12
+black~=24.2.0

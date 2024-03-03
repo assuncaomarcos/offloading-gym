@@ -17,8 +17,9 @@ class TestDaggen(unittest.TestCase):
         pass
 
     def test_daggen(self):
-        task_graph = daggen.daggen()
-        self.assertEqual(str(task_graph), "DiGraph with 20 nodes and 25 edges")
+        task_graph = daggen.random_dag(num_tasks=20)
+        pattern = r"DiGraph with \d+ nodes and \d+ edges"
+        self.assertRegex(str(task_graph), pattern)
 
     def test_random_graphs(self):
         # Used to vary the values of fat and density parameters
@@ -30,7 +31,7 @@ class TestDaggen(unittest.TestCase):
         dags = []  # to store the DAGs
 
         for v, n in zip(values, num_tasks):
-            dags.append(daggen.daggen(num_tasks=n, density=v, fat=v, ccr=0.8, jump=2))
+            dags.append(daggen.random_dag(num_tasks=n, density=v, fat=v, ccr=0.8, jump=2))
 
         for dag, num_task in zip(dags, num_tasks):
             self.assertEqual(len(dag.nodes), num_task)

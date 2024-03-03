@@ -6,6 +6,19 @@ from networkx.drawing.nx_agraph import from_agraph
 
 
 def parse_dot(path: str) -> DiGraph:
+    """
+    Parses a dot file and creates a networkx DiGraph.
+
+    Args:
+        path (str): The path to the dot file.
+
+    Returns:
+        DiGraph: The parsed graph.
+
+    Raises:
+        ImportError: If pygraphviz is not installed.
+
+    """
     try:
         import pygraphviz
     except ImportError as err:
