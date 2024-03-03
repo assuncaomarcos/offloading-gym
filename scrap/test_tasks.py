@@ -3,9 +3,9 @@
 """ Tests the task parser and task graphs """
 
 import unittest
-from offloading_gym.task_graph import Task, TaskGraph, parse_dot, daggen_graph
-import networkx as nx
+from offloading_gym.task_graph import parse_dot, daggen_graph
 import random
+
 
 class TestTaskParser(unittest.TestCase):
     """Tests the task parser."""

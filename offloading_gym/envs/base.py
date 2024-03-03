@@ -34,5 +34,6 @@ class BaseOffEnv(ABC, gym.Env, EzPickle):
             *,
             seed: Optional[int] = None,
             options: Optional[dict] = None,
-    ) -> tuple[ObsType, dict[str, Any]]:
-        pass
+    ):
+        super().reset(seed=seed)
+

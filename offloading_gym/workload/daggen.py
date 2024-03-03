@@ -2,13 +2,31 @@
 # -*- coding: utf-8 -*-
 
 """
-This module generates directed acyclic graphs (DAGs) based on parameters like task number,
-networking features, and communication to computation ratio (CCR). This is useful in
+This module generates Directed Acyclic Graphs (DAGs) based on parameters like task number,
+networking features, and Communication to Computation Ratio (CCR). This is useful in
 simulating task scheduling in parallel and distributed systems.
+
+This module is based on daggen random `graph generator <https://github.com/frs69wq/daggen>` _
+proposed by Suter & Hunold and the changes proposed by Arabnejad and Barbosa.
+For more details, see the article below:
+
+H. Arabnejad and J. Barbosa, List Scheduling Algorithm for Heterogeneous Systems by
+an Optimistic Cost Table, IEEE Transactions on Parallel and Distributed Systems,
+Vol. 25, N. 3, March 2014.
 
 This module uses Python's pseudo-random number generator to generate random numbers.
 To ensure reproducibility of results, you should seed the random number generator prior to
 invoking this module.
+
+Example:
+    >>> from random import random
+    >>> import networkx as nx
+    >>> from offloading_gym.workload import daggen
+    >>>
+    >>> random.seed(888)
+    >>> graph = daggen(num_tasks=20, ccr=0.5)
+    >>> print(graph)
+    DiGraph with 20 nodes and 25 edges
 """
 
 import random
@@ -37,7 +55,7 @@ COST_PRECISION = 4
 class TaskInfo:
     task_id: int
     computing_cost: float
-    communication_cost: float
+    data_cost: float
     n_children: int
     children: List[Any]
 
@@ -54,13 +72,13 @@ def create_tasks(n_tasks: int, fat: float, regularity: float) -> Tuple[List[List
     total_tasks = 0
     total_comp_cost = 0.0
     tasks = []
-    graph_comp_cost = random.uniform(0.0, 1.0)
+    sampled_cost = random.uniform(0.0, 1.0)
 
     while total_tasks < n_tasks:
         n_tasks_at_level = min(
             random_int_around(n_tasks_per_level, 100.0 - 100.0 * regularity), n_tasks - total_tasks
         )
-        comp_cost = round(random.uniform(0, 2 * graph_comp_cost), COST_PRECISION)
+        comp_cost = round(random.uniform(0.0, 2 * sampled_cost), COST_PRECISION)
         total_comp_cost += comp_cost
         tasks_at_level = [
             TaskInfo(task_id, comp_cost, 0, 0, []) for task_id in range(
@@ -75,7 +93,6 @@ def create_tasks(n_tasks: int, fat: float, regularity: float) -> Tuple[List[List
 
 def create_dependencies(tasks: List[List[TaskInfo]], density: float, jump: int):
     n_levels = len(tasks)
-    n_dependencies = 0
 
     # For all levels but the last one
     for level in range(1, n_levels):
@@ -105,30 +122,26 @@ def create_dependencies(tasks: List[List[TaskInfo]], density: float, jump: int):
                     # Update the parent's children list
                     parent.children.append(tasks[level][level_idx])
                     parent.n_children += 1
-                    n_dependencies += 1
-    return n_dependencies
 
 
-def create_communication_costs(total_comp_cost: float, ccr: float, num_edges: int) -> List[float]:
+def set_communication_costs(tasks: List[List[TaskInfo]], total_comp_cost: float, ccr: float):
     total_comm_cost = total_comp_cost * ccr
-    edge_costs = [random.random() for _ in range(num_edges)]
+    tasks_with_children = [task for level in tasks for task in level if task.n_children > 0]
+    comm_costs = [random.random() * task.n_children for task in tasks_with_children]
 
     # Adjust costs to match the total communication cost
-    sum_edge_costs = sum(edge_costs)
-    return [
-        round(cost * total_comm_cost / sum_edge_costs, COST_PRECISION) for cost in edge_costs
-    ]
+    sum_edge_costs = sum(comm_costs)
+    for (task, cost) in zip(tasks_with_children, comm_costs):
+        task.data_cost = round((cost * total_comm_cost / sum_edge_costs) / task.n_children, COST_PRECISION)
 
 
-def create_task_graph(task_info: List[List[TaskInfo]], comm_costs: List[float]) -> DiGraph:
+def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
     tasks, edges = [], []
-    comm_idx = 0
     for sublist in task_info:
         for task in sublist:
             tasks.append((task.task_id, {"task_id": task.task_id, "processing_cost": task.computing_cost}))
             for dest in task.children:
-                edges.append((task.task_id, dest.task_id, {"communication_cost": comm_costs[comm_idx]}))
-                comm_idx += 1
+                edges.append((task.task_id, dest.task_id, {"communication_cost": task.data_cost}))
 
     task_graph = DiGraph()
     task_graph.add_nodes_from(tasks)
@@ -170,6 +183,6 @@ def daggen(
     assert 1 <= jump <= 4, "jump_size must be between 1 and 4"
 
     tasks, total_comp_cost = create_tasks(n_tasks=num_tasks, fat=fat, regularity=regularity)
-    num_edges = create_dependencies(tasks=tasks, density=density, jump=jump)
-    comm_costs = create_communication_costs(total_comp_cost, ccr, num_edges)
-    return create_task_graph(tasks, comm_costs)
+    create_dependencies(tasks=tasks, density=density, jump=jump)
+    set_communication_costs(tasks, total_comp_cost, ccr)
+    return create_task_graph(tasks)

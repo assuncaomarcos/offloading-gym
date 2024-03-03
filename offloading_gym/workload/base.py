@@ -6,10 +6,10 @@ from typing import List, Optional
 from ..task_graph import TaskGraph
 
 
-class WorkloadGenerator(ABC):
+class Workload(ABC):
     @abstractmethod
     def step(self, offset: int = 1) -> List[Optional[TaskGraph]]:
-        raise NotImplementedError
+        """Steps the workload generator by 'offset'"""
 
     @abstractmethod
     def __len__(self):
