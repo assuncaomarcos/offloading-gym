@@ -14,7 +14,7 @@ class TestWorkload(unittest.TestCase):
 
     def setUp(self) -> None:
         random.seed(42)
-        self.workload_params = RandomDAGParameters(DEFAULT_WORKLOAD_CONFIG)
+        self.workload_params = RandomDAGParameters(**DEFAULT_WORKLOAD_CONFIG)
         self.workload = RandomDAGWorkload(tasks_per_app=NUM_TASKS, dag_parameters=self.workload_params)
 
     def tearDown(self) -> None:
