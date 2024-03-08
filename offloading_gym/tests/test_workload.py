@@ -1,20 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-""" Tests the task parser and task graphs """
+""" Tests the random workload generator """
 
 import unittest
-from offloading_gym.workload import daggen
+from offloading_gym.envs.workload import DEFAULT_WORKLOAD_CONFIG, RandomDAGWorkload
+from ..workload import daggen
 import random
 
 
 class TestDaggen(unittest.TestCase):
-    """Tests the task generator."""
+    """Tests the DAG generator."""
 
     def setUp(self) -> None:
         random.seed(42)
-
-    def tearDown(self) -> None:
-        pass
 
     def test_daggen(self):
         task_graph = daggen.random_dag(num_tasks=20)
@@ -35,6 +33,20 @@ class TestDaggen(unittest.TestCase):
 
         for dag, num_task in zip(dags, num_tasks):
             self.assertEqual(len(dag.nodes), num_task)
+
+
+class TestWorkload(unittest.TestCase):
+    """Tests the workload generator."""
+
+    def setUp(self) -> None:
+        random.seed(42)
+        self.num_tasks = DEFAULT_WORKLOAD_CONFIG["num_tasks"]
+        self.workload = RandomDAGWorkload.build(**DEFAULT_WORKLOAD_CONFIG)
+        self.workload.seed(42)
+
+    def test_create_taskgraph(self):
+        task_graph = self.workload.step(1)[0]
+        self.assertEqual(len(task_graph.nodes), self.num_tasks)
 
 
 if __name__ == "__main__":

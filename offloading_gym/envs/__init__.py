@@ -1,15 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Registers the gym environments."""
-from typing import Any
+"""Registers the gymnasium environments."""
 
-from gymnasium.envs.registration import make, pprint_registry, register, registry, spec
+from gymnasium.envs.registration import register
 
-# register(
-#     id="CartPole-v0",
-#     entry_point="gymnasium.envs.classic_control.cartpole:CartPoleEnv",
-#     vector_entry_point="gymnasium.envs.classic_control.cartpole:CartPoleVectorEnv",
-#     max_episode_steps=200,
-#     reward_threshold=195.0,
-# )
+register(
+    id="Offloading-v0",
+    entry_point="offloading_gym.envs.offloading:OffloadingEnv",
+    max_episode_steps=100
+)

@@ -14,32 +14,33 @@ H. Arabnejad and J. Barbosa, List Scheduling Algorithm for Heterogeneous Systems
 an Optimistic Cost Table, IEEE Transactions on Parallel and Distributed Systems,
 Vol. 25, N. 3, March 2014.
 
-This module uses Python's pseudo-random number generator to generate random numbers.
-To ensure reproducibility of results, you should seed the random number generator prior to
-invoking this module.
+By default, this module uses Python's singleton pseudo-random number generator to generate
+random numbers.
 
 Example:
     >>> from random import random
     >>> import networkx as nx
     >>> from offloading_gym.workload import daggen
     >>>
-    >>> random.seed(888)
-    >>> graph = random_dag(num_tasks=20, ccr=0.5)
+    >>> graph = daggen.random_dag(num_tasks=20, ccr=0.5)
     >>> print(graph)
     DiGraph with 20 nodes and 25 edges
 """
 
-import random
 import math
 from networkx import DiGraph
 from dataclasses import dataclass
 from typing import List, Any, Tuple
 from enum import Enum
+import random
 
-__all__ = ["random_dag", "DataAttributes"]
+__all__ = [
+    "random_dag",
+    "TaskDataAttr"
+]
 
 
-class DataAttributes(Enum):
+class TaskDataAttr(Enum):
     TASK_ID = "task_id"
     PROCESSING_COST = "processing_cost"
     COMMUNICATION_COST = "communication_cost"
@@ -48,7 +49,7 @@ class DataAttributes(Enum):
         return self.value
 
 
-# Default values for daggen DAGs
+# Default values for generated DAGs
 NUM_TASKS = 20
 FAT = 0.7
 REGULARITY = 0.5
@@ -163,8 +164,8 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
                 (
                     task.task_id,
                     {
-                        DataAttributes.TASK_ID: task.task_id,
-                        DataAttributes.PROCESSING_COST: task.computing_cost,
+                        TaskDataAttr.TASK_ID: task.task_id,
+                        TaskDataAttr.PROCESSING_COST: task.computing_cost,
                     },
                 )
             )
@@ -173,7 +174,7 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
                     (
                         task.task_id,
                         dest.task_id,
-                        {DataAttributes.COMMUNICATION_COST: task.data_cost},
+                        {TaskDataAttr.COMMUNICATION_COST: task.data_cost},
                     )
                 )
 
@@ -184,12 +185,12 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
 
 
 def random_dag(
-    num_tasks: int = NUM_TASKS,
-    fat: float = FAT,
-    density: float = DENSITY,
-    regularity: float = REGULARITY,
-    jump: int = JUMP_SIZE,
-    ccr: float = CCR,
+        num_tasks: int = NUM_TASKS,
+        fat: float = FAT,
+        density: float = DENSITY,
+        regularity: float = REGULARITY,
+        jump: int = JUMP_SIZE,
+        ccr: float = CCR,
 ) -> DiGraph:
     """
     Generates a directed acyclic graph (DAG) representing a task graph.
@@ -222,6 +223,6 @@ def random_dag(
     create_dependencies(tasks=tasks, density=density, jump=jump)
     set_communication_costs(tasks, total_comp_cost, ccr)
     task_graph = create_task_graph(tasks)
-    task_graph.graph[DataAttributes.PROCESSING_COST] = total_comp_cost
-    task_graph.graph[DataAttributes.COMMUNICATION_COST] = total_comp_cost * ccr
+    task_graph.graph[TaskDataAttr.PROCESSING_COST] = total_comp_cost
+    task_graph.graph[TaskDataAttr.COMMUNICATION_COST] = total_comp_cost * ccr
     return task_graph
