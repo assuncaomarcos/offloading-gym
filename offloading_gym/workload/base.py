@@ -26,10 +26,6 @@ class Workload(ABC):
         self.current_time = 0
 
     @abstractmethod
-    def seed(self, seed: int = None):
-        """Seeds the workload's random number generator."""
-
-    @abstractmethod
     def step(self, offset: int = 1) -> List[Optional[TaskGraph]]:
         """Steps the workload generator by 'offset'"""
 

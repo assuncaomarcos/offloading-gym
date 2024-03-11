@@ -16,8 +16,18 @@ class TestOffloadingEnv(unittest.TestCase):
             },
         )
         _ = env.reset()
-        # action = 0
-        # done = False
-        # while not done:
-        #     _, _, done, _ = env.step(action)
-        # self.assertTrue(done)
+    #     # action = 0
+    #     # done = False
+    #     # while not done:
+    #     #     _, _, done, _ = env.step(action)
+    #     # self.assertTrue(done)
+
+    # def test_runtimes(self):
+    #     env: OffloadingEnv = gym.make(  # type: ignore
+    #             "Offloading-v0",
+    #             **{
+    #                 'use_raw_state': True,
+    #                 'tasks_per_app': 20
+    #             },
+    #         )
+    #     tasks = task_minimum_runtimes()

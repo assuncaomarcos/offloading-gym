@@ -3,7 +3,8 @@
 """ Tests the random workload generator """
 
 import unittest
-from offloading_gym.envs.workload import DEFAULT_WORKLOAD_CONFIG, RandomDAGWorkload
+from offloading_gym.workload import RandomDAGGenerator
+from offloading_gym.envs.workload import RANDOM_WORKLOAD_CONFIG
 from ..workload import daggen
 import random
 
@@ -40,13 +41,17 @@ class TestWorkload(unittest.TestCase):
 
     def setUp(self) -> None:
         random.seed(42)
-        self.num_tasks = DEFAULT_WORKLOAD_CONFIG["num_tasks"]
-        self.workload = RandomDAGWorkload.build(**DEFAULT_WORKLOAD_CONFIG)
-        self.workload.seed(42)
+        self.num_tasks = RANDOM_WORKLOAD_CONFIG["num_tasks"]
+        self.workload = RandomDAGGenerator(**RANDOM_WORKLOAD_CONFIG)
 
     def test_create_taskgraph(self):
         task_graph = self.workload.step(1)[0]
         self.assertEqual(len(task_graph.nodes), self.num_tasks)
+
+    def test_successors(self):
+        task_graph = self.workload.step(1)[0]
+        successors = task_graph.succ
+        self.assertEqual(successors[1][2]['datasize'], 809)
 
 
 if __name__ == "__main__":

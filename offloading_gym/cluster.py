@@ -42,7 +42,7 @@ class Cluster(object):
         """
         return num_fps / self.num_edge_resources * self.edge_resource_fps
 
-    def ud_execution_time(self, num_fps: int) -> float:
+    def local_execution_time(self, num_fps: int) -> float:
         """ Computes the execution time of a task on a user device """
         return num_fps / self.user_device_fps
 

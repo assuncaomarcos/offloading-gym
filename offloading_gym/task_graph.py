@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from typing import Any
+from typing import Any, Dict
 from collections.abc import Mapping, Set
 
 from networkx import DiGraph
@@ -21,12 +21,21 @@ class TaskAttr(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self['task_id'] = kwargs.get('task_id', -1)
+        self['task_size'] = kwargs.get('task_size', 0)
         self['processing_demand'] = kwargs.get('processing_demand', 0)
         self['output_datasize'] = kwargs.get('output_datasize', 0)
 
     @property
     def task_id(self) -> int:
         return self['task_id']
+
+    @property
+    def task_size(self) -> int:
+        return self['task_size']
+
+    @task_size.setter
+    def task_size(self, value: int):
+        self['task_size'] = value
 
     @property
     def processing_demand(self) -> int:

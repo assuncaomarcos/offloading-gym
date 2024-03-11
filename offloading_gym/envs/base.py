@@ -20,7 +20,7 @@ __all__ = [
 
 
 class BaseOffEnv(ABC, gym.Env, EzPickle):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 2}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
     tasks_per_app: int
 
     @abstractmethod

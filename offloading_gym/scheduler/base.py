@@ -21,4 +21,4 @@ class Scheduler(ABC):
 
     @abstractmethod
     def schedule_tasks(self, tasks):
-        pass
+        """Schedules a list of tasks onto the available resources."""
