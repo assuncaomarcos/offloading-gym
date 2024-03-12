@@ -6,9 +6,9 @@ from ..scheduler import Scheduler
 DEFAULT_SCHEDULER_CONFIG = {
     "type": "fifo_scheduler",
     "num_edge_resources": 10,
-    "edge_resource_fps": 10.0 * 1024 * 1024,
+    "edge_resource_fps": 1024 * 1024,
     "num_user_devices": 1,
-    "user_device_fps": 1.0 * 1024 * 1024,
+    "user_device_fps": 1024 * 1024,
     "comm_link_mbps": 10
 }
 

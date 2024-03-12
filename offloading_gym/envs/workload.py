@@ -11,16 +11,14 @@ __all__ = [
 RANDOM_WORKLOAD_CONFIG = {
     "type": "random_dag",
     "num_tasks": 20,
-    "min_computing": 1.0e7,  # Each task requires between 10^7 and 10^8 cycles
+    "min_computing": 1.0e7,         # Each task requires between 10^7 and 10^8 cycles
     "max_computing": 1.0e8,
-    "min_task_size": 5120,        # Size of the task code/executable
-    "max_task_size": 51200,
-    "min_datasize": 5120,    # Each task produces between 5KB and 50KB of data
+    "min_datasize": 5120,           # Each task produces between 5KB and 50KB of data
     "max_datasize": 51200,
     "density_values": [0.2, 0.8],
-    "regularity_values": [0.2, 0.8],
+    "regularity_values": [0.2, 0.5, 0.8],
     "fat_values": [0.1, 0.4, 0.8],
-    "ccr_values": [0.1, 0.5, 0.8, 1.0, 2.0, 5.0, 10.0],
+    "ccr_values": [0.1, 0.5, 0.8],
     "jump_values": [1, 2, 4],
 }
 

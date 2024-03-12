@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from typing import List, Any
+import itertools
 
 
 def pad_list(lst: List[Any], target_length: int, pad_value: float = -1.0):
@@ -25,7 +26,7 @@ def merge_arrays(arrays, to_numpy_array=True):
     return np.array([merged]) if to_numpy_array else [merged]
 
 
-def create_binary_sequences(length):
+def binary_sequences(length):
     """
     Generates binary sequences of a given length.
 
@@ -36,16 +37,9 @@ def create_binary_sequences(length):
         list: A list of binary sequences, where each sequence is represented as a list of integers.
 
     Example:
-        >>> create_binary_sequences(3)
+        >>> binary_sequences(3)
         [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]]
     """
-    sequences = []
-    for i in range(2 ** length):
-        binary_str = bin(i)[2:]
-        binary_sequence = [int(x) for x in binary_str]
-        while len(binary_sequence) < length:
-            binary_sequence.insert(0, 0)
-        sequences.append(binary_sequence)
-    return sequences
+    return list(itertools.product([0, 1], repeat=length))
 
 

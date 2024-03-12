@@ -14,14 +14,17 @@ H. Arabnejad and J. Barbosa, List Scheduling Algorithm for Heterogeneous Systems
 an Optimistic Cost Table, IEEE Transactions on Parallel and Distributed Systems,
 Vol. 25, N. 3, March 2014.
 
-By default, this module uses Python's singleton pseudo-random number generator to generate
-random numbers.
+This module uses Python's singleton pseudo-random number generator and Numpy to generate
+random numbers. To ensure reproducibility, you should seed these before generating DAGs.
+For conviency, the function `seed` exposed by this module seeds Python's and Numpy's
+random number generators.
 
 Example:
     >>> from random import random
     >>> import networkx as nx
     >>> from offloading_gym.workload import daggen
     >>>
+    >>> daggen.seed(42)
     >>> graph = daggen.random_dag(num_tasks=20, ccr=0.5)
     >>> print(graph)
     DiGraph with 20 nodes and 25 edges
@@ -31,22 +34,13 @@ import math
 from networkx import DiGraph
 from dataclasses import dataclass
 from typing import List, Any, Tuple
-from enum import Enum
 import random
+import numpy as np
 
 __all__ = [
     "random_dag",
-    "TaskDataAttr"
+    "seed"
 ]
-
-
-class TaskDataAttr(Enum):
-    TASK_ID = "task_id"
-    PROCESSING_COST = "processing_cost"
-    COMMUNICATION_COST = "communication_cost"
-
-    def __str__(self):
-        return self.value
 
 
 # Default values for generated DAGs
@@ -56,6 +50,10 @@ REGULARITY = 0.5
 DENSITY = 0.6
 JUMP_SIZE = 1
 CCR = 0.3
+MIN_DATA = 5120              # Data sizes of 5KB - 50KB
+MAX_DATA = 51200
+MIN_COMPUTATION = 10 ** 7    # Each task requires between 10^7 and 10^8 cycles
+MAX_COMPUTATION = 10 ** 8
 
 COST_PRECISION = 4
 
@@ -69,30 +67,43 @@ class TaskInfo:
     children: List[Any]
 
 
+def seed(random_seed: int) -> None:
+    """ Sets the random seed for the random number generators. """
+    random.seed(random_seed)
+    np.random.seed(random_seed)
+
+
 def random_int_in_range(num, range_percent: float) -> int:
     """Generates a random integer within a range around a specified number."""
     r = -range_percent + (2 * range_percent * random.random())
-    new_int = max(1, int(num * (1.0 + r / 100.00)))
-    return new_int
+    return max(1, int(num * (1.0 + r / 100.00)))
+
+
+def scale_array(input_array: List[float], min_val: float, max_val: float) -> List[float]:
+    np_array = np.array(input_array)
+    min_arr = np.amin(np_array)
+    max_arr = np.amax(np_array)
+    output_array = (np_array - min_arr) / (max_arr - min_arr)
+    return list(output_array * (max_val - min_val) + min_val)
 
 
 def create_tasks(
-    n_tasks: int, fat: float, regularity: float
-) -> Tuple[List[List[TaskInfo]], float]:
+        n_tasks: int,
+        fat: float,
+        regularity: float,
+        min_comp: int, max_comp: int
+) -> List[List[TaskInfo]]:
     # Compute the number of tasks per level
     n_tasks_per_level = int(fat * math.sqrt(n_tasks))
     total_tasks = 0
-    total_comp_cost = 0.0
     tasks = []
-    sampled_cost = random.uniform(0.0, 1.0)
 
     while total_tasks < n_tasks:
         n_tasks_at_level = min(
             random_int_in_range(n_tasks_per_level, 100.0 - 100.0 * regularity),
             n_tasks - total_tasks,
         )
-        comp_cost = round(random.uniform(0.0, 2 * sampled_cost), COST_PRECISION)
-        total_comp_cost += comp_cost
+        comp_cost = random.randint(min_comp, max_comp)
         tasks_at_level = [
             TaskInfo(task_id, comp_cost, 0, 0, [])
             for task_id in range(total_tasks + 1, total_tasks + 1 + n_tasks_at_level)
@@ -100,7 +111,7 @@ def create_tasks(
         tasks.append(tasks_at_level)
         total_tasks += n_tasks_at_level
 
-    return tasks, total_comp_cost
+    return tasks
 
 
 def create_dependencies(tasks: List[List[TaskInfo]], density: float, jump: int) -> None:
@@ -140,20 +151,20 @@ def create_dependencies(tasks: List[List[TaskInfo]], density: float, jump: int) 
 
 
 def set_communication_costs(
-    tasks: List[List[TaskInfo]], total_comp_cost: float, ccr: float
+        tasks: List[List[TaskInfo]],
+        ccr: float,
+        min_data: int,
+        max_data: int
 ) -> None:
-    total_comm_cost = total_comp_cost * ccr
-    tasks_with_children = [
-        task for level in tasks for task in level if task.n_children > 0
-    ]
-    comm_costs = [random.random() * task.n_children for task in tasks_with_children]
+    # To compute the CCR the original model has communication costs associated to edges,
+    # but to reproduce the results of the MRLCO paper, we consider all tasks here since the result of
+    # sinks may need to be returned to the local device.
+    flat_task_list = [task for level in tasks for task in level]
+    comp_costs = [task.computing_cost * ccr for task in flat_task_list]
+    comm_costs = scale_array(input_array=comp_costs, min_val=min_data, max_val=max_data)
 
-    # Adjust costs to match the total communication cost
-    sum_edge_costs = sum(comm_costs)
-    for task, cost in zip(tasks_with_children, comm_costs):
-        task.data_cost = round(
-            (cost * total_comm_cost / sum_edge_costs) / task.n_children, COST_PRECISION
-        )
+    for task, cost in zip(flat_task_list, comm_costs):
+        task.data_cost = int(cost)
 
 
 def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
@@ -164,8 +175,9 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
                 (
                     task.task_id,
                     {
-                        TaskDataAttr.TASK_ID: task.task_id,
-                        TaskDataAttr.PROCESSING_COST: task.computing_cost,
+                        "task_id": task.task_id,
+                        "processing_demand": task.computing_cost,
+                        "output_datasize": task.data_cost
                     },
                 )
             )
@@ -174,7 +186,7 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
                     (
                         task.task_id,
                         dest.task_id,
-                        {TaskDataAttr.COMMUNICATION_COST: task.data_cost},
+                        {"datasize": task.data_cost},
                     )
                 )
 
@@ -191,23 +203,30 @@ def random_dag(
         regularity: float = REGULARITY,
         jump: int = JUMP_SIZE,
         ccr: float = CCR,
+        min_comp: int = MIN_COMPUTATION,
+        max_comp: int = MAX_COMPUTATION,
+        min_data: int = MIN_DATA,
+        max_data: int = MAX_DATA
 ) -> DiGraph:
-    """
-    Generates a directed acyclic graph (DAG) representing a task graph.
+    """ Generates a random task DAG.
 
     Args:
-        num_tasks (int): The number of tasks in the task graph. Default is 20.
-        fat (float): The fatness factor for task durations. Default is 0.7.
-        density (float): The density factor for task dependencies. Default is 0.6.
-        regularity (float): The regularity factor for task durations. Default is 0.5.
-        jump (int): The jump size for task dependencies. Default is 1.
-        ccr (float): The communication-to-computation ratio. Default is 0.3.
+        num_tasks: the number of tasks in the DAG.
+        fat: the fatness factor of the DAG.
+        density: the density factor of the dependencies between tasks.
+        regularity: the regularity factor of the DAG.
+        jump: the jump size for creating dependencies between tasks.
+        ccr: the communication-to-computation ratio.
+        min_comp: the minimum computation cost for tasks.
+        max_comp: the maximum computation cost for tasks.
+        min_data: the minimum data size for tasks' communication costs.
+        max_data: the maximum data size for tasks' communication costs.
 
     Returns:
-        DiGraph: The generated task graph as a NetworkX DiGraph object.
+        A DiGraph representing the randomly generated DAG with the specified parameters.
 
     Raises:
-        AssertionError: If any of the input parameters fail the specified constraints.
+        AssertionError: If any of the input parameters do not meet their constraints.
 
     """
     assert num_tasks >= 1, "num_tasks must be >= 1"
@@ -216,13 +235,14 @@ def random_dag(
     assert 0 <= regularity <= 1, "regularity must be between 0 and 1"
     assert 0 <= ccr <= 10, "ccr must be between 0 and 10"
     assert 1 <= jump <= 4, "jump_size must be between 1 and 4"
+    assert 0 <= min_comp <= max_comp, "min_comp must be smaller than max_comp, and both must be greater than 0"
+    assert 0 <= min_data <= max_data, "min_data must be smaller than max_data, and both must be greater than 0"
 
-    tasks, total_comp_cost = create_tasks(
-        n_tasks=num_tasks, fat=fat, regularity=regularity
+    tasks = create_tasks(
+        n_tasks=num_tasks, fat=fat, regularity=regularity,
+        min_comp=min_comp, max_comp=max_comp
     )
-    create_dependencies(tasks=tasks, density=density, jump=jump)
-    set_communication_costs(tasks, total_comp_cost, ccr)
+    create_dependencies(tasks, density, jump)
+    set_communication_costs(tasks, ccr, min_data, max_data)
     task_graph = create_task_graph(tasks)
-    task_graph.graph[TaskDataAttr.PROCESSING_COST] = total_comp_cost
-    task_graph.graph[TaskDataAttr.COMMUNICATION_COST] = total_comp_cost * ccr
     return task_graph

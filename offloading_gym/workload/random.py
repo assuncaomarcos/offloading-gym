@@ -3,7 +3,7 @@
 
 from typing import List, Optional, Dict, Any, Tuple
 from ..task_graph import TaskGraph, TaskAttr, EdgeAttr
-from .daggen import random_dag, TaskDataAttr
+from .daggen import random_dag
 from .base import Workload
 import random
 
@@ -13,9 +13,6 @@ class RandomDAGGenerator(Workload):
     def __init__(self, length: int = 0, **kwargs):
         super().__init__(length=length)
         self.num_tasks = self.get_value(kwargs, "num_tasks")
-        self.min_size, self.max_size = self.min_max(
-            kwargs, "min_task_size", "max_task_size"
-        )
         self.min_datasize, self.max_datasize = self.min_max(
             kwargs, "min_datasize", "max_datasize"
         )
@@ -66,21 +63,17 @@ class RandomDAGGenerator(Workload):
     def random_task_graph(self) -> TaskGraph:
         dag_params = self.random_daggen_params()
         dag = random_dag(**dag_params)
-
-        task_size = random.uniform(self.min_size, self.max_size)
-        datasize = random.uniform(self.min_datasize, self.max_datasize)
-        computing = random.uniform(self.min_computing, self.max_computing)
         tasks, edges = [], []
 
         for node_id, data in dag.nodes.items():
-            task_comp = int(data[TaskDataAttr.PROCESSING_COST] * computing)
             tasks.append(
                 (
                     node_id,
                     TaskAttr(
                         task_id=node_id,
-                        processing_demand=task_comp,
-                        task_size=task_size,
+                        processing_demand=data["processing_demand"],
+                        task_size=data["output_datasize"],
+                        output_datasize=data["output_datasize"]
                     ),
                 )
             )
@@ -91,7 +84,7 @@ class RandomDAGGenerator(Workload):
                     src,
                     dst,
                     EdgeAttr(
-                        datasize=int(data[TaskDataAttr.COMMUNICATION_COST] * datasize)
+                        datasize=data["datasize"]
                     ),
                 )
             )

@@ -40,7 +40,7 @@ class Cluster(object):
         Computes the execution time on the edge resources.
         It assumes a task can use all resources and that the parallelization overhead is negligible
         """
-        return num_fps / self.num_edge_resources * self.edge_resource_fps
+        return num_fps / (self.num_edge_resources * self.edge_resource_fps)
 
     def local_execution_time(self, num_fps: int) -> float:
         """ Computes the execution time of a task on a user device """
@@ -48,5 +48,5 @@ class Cluster(object):
 
     def transmission_time(self, num_bytes: int) -> float:
         """ Computes the time to transfer a given number of bytes through communication link """
-        return (num_bytes / BITS_IN_MEGABIT) / self.comm_link_mbps
+        return (num_bytes * 8 / BITS_IN_MEGABIT) / self.comm_link_mbps
 
