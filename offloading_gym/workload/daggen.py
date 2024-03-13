@@ -33,14 +33,11 @@ Example:
 import math
 from networkx import DiGraph
 from dataclasses import dataclass
-from typing import List, Any, Tuple
+from typing import List, Any
 import random
 import numpy as np
 
-__all__ = [
-    "random_dag",
-    "seed"
-]
+__all__ = ["random_dag", "seed"]
 
 
 # Default values for generated DAGs
@@ -50,10 +47,10 @@ REGULARITY = 0.5
 DENSITY = 0.6
 JUMP_SIZE = 1
 CCR = 0.3
-MIN_DATA = 5120              # Data sizes of 5KB - 50KB
+MIN_DATA = 5120  # Data sizes of 5KB - 50KB
 MAX_DATA = 51200
-MIN_COMPUTATION = 10 ** 7    # Each task requires between 10^7 and 10^8 cycles
-MAX_COMPUTATION = 10 ** 8
+MIN_COMPUTATION = 10**7  # Each task requires between 10^7 and 10^8 cycles
+MAX_COMPUTATION = 10**8
 
 COST_PRECISION = 4
 
@@ -68,7 +65,7 @@ class TaskInfo:
 
 
 def seed(random_seed: int) -> None:
-    """ Sets the random seed for the random number generators. """
+    """Sets the random seed for the random number generators."""
     random.seed(random_seed)
     np.random.seed(random_seed)
 
@@ -79,7 +76,9 @@ def random_int_in_range(num, range_percent: float) -> int:
     return max(1, int(num * (1.0 + r / 100.00)))
 
 
-def scale_array(input_array: List[float], min_val: float, max_val: float) -> List[float]:
+def scale_array(
+    input_array: List[float], min_val: float, max_val: float
+) -> List[float]:
     np_array = np.array(input_array)
     min_arr = np.amin(np_array)
     max_arr = np.amax(np_array)
@@ -88,10 +87,7 @@ def scale_array(input_array: List[float], min_val: float, max_val: float) -> Lis
 
 
 def create_tasks(
-        n_tasks: int,
-        fat: float,
-        regularity: float,
-        min_comp: int, max_comp: int
+    n_tasks: int, fat: float, regularity: float, min_comp: int, max_comp: int
 ) -> List[List[TaskInfo]]:
     # Compute the number of tasks per level
     n_tasks_per_level = int(fat * math.sqrt(n_tasks))
@@ -109,7 +105,7 @@ def create_tasks(
                 computing_cost=random.randint(min_comp, max_comp),
                 data_cost=0,
                 n_children=0,
-                children=[]
+                children=[],
             )
             for task_id in range(total_tasks + 1, total_tasks + 1 + n_tasks_at_level)
         ]
@@ -156,10 +152,7 @@ def create_dependencies(tasks: List[List[TaskInfo]], density: float, jump: int) 
 
 
 def set_communication_costs(
-        tasks: List[List[TaskInfo]],
-        ccr: float,
-        min_data: int,
-        max_data: int
+    tasks: List[List[TaskInfo]], ccr: float, min_data: int, max_data: int
 ) -> None:
     # To compute the CCR the original model has communication costs associated to edges,
     # but to reproduce the results of the MRLCO paper, we consider all tasks here since the result of
@@ -182,7 +175,7 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
                     {
                         "task_id": task.task_id,
                         "processing_demand": task.computing_cost,
-                        "output_datasize": task.data_cost
+                        "output_datasize": task.data_cost,
                     },
                 )
             )
@@ -202,18 +195,18 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
 
 
 def random_dag(
-        num_tasks: int = NUM_TASKS,
-        fat: float = FAT,
-        density: float = DENSITY,
-        regularity: float = REGULARITY,
-        jump: int = JUMP_SIZE,
-        ccr: float = CCR,
-        min_comp: int = MIN_COMPUTATION,
-        max_comp: int = MAX_COMPUTATION,
-        min_data: int = MIN_DATA,
-        max_data: int = MAX_DATA
+    num_tasks: int = NUM_TASKS,
+    fat: float = FAT,
+    density: float = DENSITY,
+    regularity: float = REGULARITY,
+    jump: int = JUMP_SIZE,
+    ccr: float = CCR,
+    min_comp: int = MIN_COMPUTATION,
+    max_comp: int = MAX_COMPUTATION,
+    min_data: int = MIN_DATA,
+    max_data: int = MAX_DATA,
 ) -> DiGraph:
-    """ Generates a random task DAG.
+    """Generates a random task DAG.
 
     Args:
         num_tasks: the number of tasks in the DAG.
@@ -240,12 +233,19 @@ def random_dag(
     assert 0 <= regularity <= 1, "regularity must be between 0 and 1"
     assert 0 <= ccr <= 10, "ccr must be between 0 and 10"
     assert 1 <= jump <= 4, "jump_size must be between 1 and 4"
-    assert 0 <= min_comp <= max_comp, "min_comp must be smaller than max_comp, and both must be greater than 0"
-    assert 0 <= min_data <= max_data, "min_data must be smaller than max_data, and both must be greater than 0"
+    assert (
+        0 <= min_comp <= max_comp
+    ), "min_comp must be smaller than max_comp, and both must be greater than 0"
+    assert (
+        0 <= min_data <= max_data
+    ), "min_data must be smaller than max_data, and both must be greater than 0"
 
     tasks = create_tasks(
-        n_tasks=num_tasks, fat=fat, regularity=regularity,
-        min_comp=min_comp, max_comp=max_comp
+        n_tasks=num_tasks,
+        fat=fat,
+        regularity=regularity,
+        min_comp=min_comp,
+        max_comp=max_comp,
     )
     create_dependencies(tasks, density, jump)
     set_communication_costs(tasks, ccr, min_data, max_data)

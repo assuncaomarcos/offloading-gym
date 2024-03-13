@@ -158,12 +158,12 @@ def compute_task_ranks(cluster: Cluster, task_graph: TaskGraph):
 
 def task_embeddings(task_graph: TaskGraph, task_encoder: Callable[[TaskAttr], List[float]]) -> np.ndarray:
     """ Creates a list of task embeddings as per the MRLCO paper. """
-    embeddings = []
+    task_info = []
     for task_id, task_attr in task_graph.nodes().items():
         task_predecessors = list(task_graph.pred[task_id].keys())
         task_successors = list(task_graph.succ[task_id].keys())
         encoded_task = task_encoder(task_attr)
-        embeddings.append(
+        task_info.append(
             encoded_task
             + arrays.pad_list(lst=task_predecessors, target_length=PREDECESSOR_TASKS, pad_value=-1.0)
             + arrays.pad_list(lst=task_successors, target_length=SUCCESSOR_TASKS, pad_value=-1.0)
@@ -179,71 +179,8 @@ def task_embeddings(task_graph: TaskGraph, task_encoder: Callable[[TaskAttr], Li
     def normalize_times(features: np.ndarray) -> np.ndarray:
         return (features - features.min()) / (features.max() - features.min())
 
-    np_embeddings = np.array(embeddings, dtype=np.float32)
-    np_embeddings[:, EMBED_ID_COLUMNS] = normalize_task_ids(np_embeddings[:, EMBED_ID_COLUMNS])
-    np_embeddings[:, EMBED_TIME_COLUMNS] = normalize_times(np_embeddings[:, EMBED_TIME_COLUMNS])
+    embeddings = np.array(task_info, dtype=np.float32)
+    embeddings[:, EMBED_ID_COLUMNS] = normalize_task_ids(embeddings[:, EMBED_ID_COLUMNS])
+    embeddings[:, EMBED_TIME_COLUMNS] = normalize_times(embeddings[:, EMBED_TIME_COLUMNS])
 
-    return np_embeddings
-
-
-#
-# def task_graph_embedding(task_graph: TaskGraph) -> np.ndarray:
-#     successors = task_graph.succ
-#     predecessors = task_graph.pred
-
-        # embedding = np.zeros(shape=self.task_graph_space.shape, dtype=np.float32)
-        #
-        # return embedding
-
-    # def encode_graph(self, task_encoder: ABCTaskEncoding = None, task_sorting: ABCTaskSorting = None):
-    #     sequence = []
-    #     for task_idx in range(self.number_of_tasks):
-    #         task = self.tasks[task_idx]
-    #         predecessors, successors = [], []
-    #
-    #         for pred_idx in range(0, task_idx):
-    #             if self.task_dependencies[pred_idx][task_idx] > 0.1:
-    #                 predecessors.append(pred_idx)
-    #
-    #         for suc_idx in range(task_idx + 1, self.number_of_tasks):
-    #             if self.task_dependencies[task_idx][suc_idx] > 0.1:
-    #                 successors.append(suc_idx)
-    #
-    #         predecessors = pad_list(predecessors, TaskGraph.ENCODING_LENGTH)[0:TaskGraph.ENCODING_LENGTH]
-    #         successors = pad_list(successors, TaskGraph.ENCODING_LENGTH)[0:TaskGraph.ENCODING_LENGTH]
-    #
-    #         if task_encoder is not None:
-    #             encoded_task = task_encoder.encode_task(task_idx, task)
-    #         else:
-    #             encoded_task = [
-    #                 self.normalize_datasize(task.proc_datasize),
-    #                 self.normalize_datasize(task.trans_datasize)
-    #             ]
-    #
-    #         sequence.append(encoded_task + predecessors + successors)
-    #
-    #     if task_sorting is not None:
-    #         sequence = [sequence[i] for i in task_sorting.index_array(self.tasks, self.successors)]
-    #
-    #     return sequence
-
-    # def index_array(self, tasks: List[Task], successors: Dict[int, List[int]]) -> np.ndarray:
-    #     task_number = len(tasks)
-    #     runtimes = self._compute_task_runtimes(tasks)
-    #     rank_dict = [-1.0] * task_number
-    #
-    #     def rank(task_index):
-    #         if rank_dict[task_index] != -1:
-    #             return rank_dict[task_index]
-    #
-    #         if len(successors[task_index]) == 0:
-    #             rank_dict[task_index] = runtimes[task_index]
-    #             return rank_dict[task_index]
-    #         else:
-    #             rank_dict[task_index] = runtimes[task_index] + max(rank(j) for j in successors[task_index])
-    #             return rank_dict[task_index]
-    #
-    #     for task_idx in range(task_number):
-    #         rank(task_idx)
-    #
-    #     return np.argsort(rank_dict)[::-1]
+    return embeddings

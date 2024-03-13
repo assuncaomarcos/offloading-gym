@@ -8,13 +8,14 @@ from ..cluster import Cluster
 class Scheduler(ABC):
     cluster: Cluster
 
-    def __init__(self,
-                 num_edge_resources: int,
-                 edge_resource_fps: float,
-                 num_user_devices: int,
-                 user_device_fps: float,
-                 comm_link_mbps: int
-                 ):
+    def __init__(
+            self,
+            num_edge_resources: int,
+            edge_resource_fps: float,
+            num_user_devices: int,
+            user_device_fps: float,
+            comm_link_mbps: int
+    ):
         self.cluster = Cluster(
             num_edge_resources, edge_resource_fps, num_user_devices, user_device_fps, comm_link_mbps
         )

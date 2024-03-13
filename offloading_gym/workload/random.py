@@ -73,7 +73,7 @@ class RandomDAGGenerator(Workload):
                         task_id=node_id,
                         processing_demand=data["processing_demand"],
                         task_size=data["output_datasize"],
-                        output_datasize=data["output_datasize"]
+                        output_datasize=data["output_datasize"],
                     ),
                 )
             )
@@ -83,9 +83,7 @@ class RandomDAGGenerator(Workload):
                 (
                     src,
                     dst,
-                    EdgeAttr(
-                        datasize=data["datasize"]
-                    ),
+                    EdgeAttr(datasize=data["datasize"]),
                 )
             )
 
