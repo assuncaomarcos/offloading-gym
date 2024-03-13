@@ -2,13 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import random
-import jax as jnp
 import numpy as np
-from typing import Tuple, Optional, Any, NamedTuple
 from abc import ABC, abstractmethod
 
 import gymnasium as gym
-from gymnasium.core import ObsType
 from gymnasium.utils import EzPickle
 
 
@@ -44,8 +41,7 @@ class BaseOffEnv(ABC, gym.Env, EzPickle):
     def seed(seed=None):
         if seed is None:
             seed = random.randint(0, 99999999)
-        jnp.random.seed(seed)
-        np.random.seed(seed)      # In case some other library uses numpy
+        np.random.seed(seed)        # In case some other library uses numpy
         random.seed(seed)
         return [seed]
 

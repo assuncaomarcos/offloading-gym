@@ -103,9 +103,14 @@ def create_tasks(
             random_int_in_range(n_tasks_per_level, 100.0 - 100.0 * regularity),
             n_tasks - total_tasks,
         )
-        comp_cost = random.randint(min_comp, max_comp)
         tasks_at_level = [
-            TaskInfo(task_id, comp_cost, 0, 0, [])
+            TaskInfo(
+                task_id=task_id,
+                computing_cost=random.randint(min_comp, max_comp),
+                data_cost=0,
+                n_children=0,
+                children=[]
+            )
             for task_id in range(total_tasks + 1, total_tasks + 1 + n_tasks_at_level)
         ]
         tasks.append(tasks_at_level)

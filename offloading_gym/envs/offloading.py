@@ -1,28 +1,31 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import gymnasium as gym
-from .base import BaseOffEnv
-from ..scheduler import Scheduler
 from typing import Union, Optional, Tuple, List, Any, NamedTuple, Callable
-from ..workload import Workload
-from .workload import build_workload, RANDOM_WORKLOAD_CONFIG
-from .scheduler import build_scheduler, DEFAULT_SCHEDULER_CONFIG
-from ..task_graph import TaskGraph, TaskAttr
-from ..cluster import Cluster
-from ..utils import arrays
-import jax.numpy as jnp
+
+import gymnasium as gym
 import numpy as np
-import jax
+
+from .base import BaseOffEnv
+from .scheduler import build_scheduler, DEFAULT_SCHEDULER_CONFIG
+from .workload import build_workload, RANDOM_WORKLOAD_CONFIG
+from ..cluster import Cluster
+from ..scheduler import Scheduler
+from ..task_graph import TaskGraph, TaskAttr
+from ..utils import arrays
+from ..workload import Workload
 
 # Number of downstream/upstream tasks considered when encoding a task graph
 SUCCESSOR_TASKS = PREDECESSOR_TASKS = 6
 TASK_PROFILE_LENGTH = 5
 
+# Columns of the graph embedding that contain task ids and times
+EMBED_ID_COLUMNS = [0] + list(range(TASK_PROFILE_LENGTH, TASK_PROFILE_LENGTH + PREDECESSOR_TASKS + SUCCESSOR_TASKS))
+EMBED_TIME_COLUMNS = list(range(1, TASK_PROFILE_LENGTH))
+
 
 class OffloadingState(NamedTuple):
-    task_embeddings: np.ndarray
-    task_dependencies: np.ndarray
+    graph_embedding: np.ndarray
     scheduling_plan: np.ndarray
 
 
@@ -37,7 +40,7 @@ class TaskProfileEncoder(Callable[[TaskAttr], List[float]]):
         upload_cost = self.cluster.transmission_time(task.task_size)
         edge_exec_cost = self.cluster.edge_execution_time(task.processing_demand)
         download_cost = self.cluster.transmission_time(task.output_datasize)
-        return [local_exec_cost, upload_cost, edge_exec_cost, download_cost, float(task.task_id)]
+        return [float(task.task_id), local_exec_cost, upload_cost, edge_exec_cost, download_cost]
 
 
 class OffloadingEnv(BaseOffEnv):
@@ -62,6 +65,7 @@ class OffloadingEnv(BaseOffEnv):
         self.scheduler = build_scheduler(self.scheduler_config)
         self.task_encoder = TaskProfileEncoder(self.scheduler.cluster)
         self.task_graph = None
+        self.graph_embedding = None
 
     def _setup_spaces(self):
         self.action_space = gym.spaces.MultiBinary(self.tasks_per_app)
@@ -101,8 +105,7 @@ class OffloadingEnv(BaseOffEnv):
         super().reset(seed=seed)
         self.task_graph = self.workload.step(offset=0)[0]            # Use only the first task graph
         compute_task_ranks(self.scheduler.cluster, self.task_graph)
-        embeddings = task_embeddings(task_graph=self.task_graph, task_encoder=self.task_encoder)
-        # print(embeddings)
+        self.graph_embedding = task_embeddings(task_graph=self.task_graph, task_encoder=self.task_encoder)
 
         # return self.state, {}
 
@@ -166,22 +169,20 @@ def task_embeddings(task_graph: TaskGraph, task_encoder: Callable[[TaskAttr], Li
             + arrays.pad_list(lst=task_successors, target_length=SUCCESSOR_TASKS, pad_value=-1.0)
         )
 
-    def normalize_dependencies(dependencies: np.ndarray) -> np.ndarray:
+    def normalize_task_ids(dependencies: np.ndarray) -> np.ndarray:
         mask = dependencies != -1
         min_val = dependencies[mask].min()
         max_val = dependencies[mask].max()
         dependencies[mask] = (dependencies[mask] - min_val) / (max_val - min_val)
         return dependencies
 
-    def normalize_features(features: np.ndarray) -> np.ndarray:
+    def normalize_times(features: np.ndarray) -> np.ndarray:
         return (features - features.min()) / (features.max() - features.min())
 
-    for e in embeddings:
-        print(e)
-
     np_embeddings = np.array(embeddings, dtype=np.float32)
-    # np_embeddings[TASK_PROFILE_LENGTH, :] = normalize_dependencies(np_embeddings[TASK_PROFILE_LENGTH, :])   # Normalize task ids and dependencies
-    # np_embeddings[:, :TASK_PROFILE_LENGTH - 1] = normalize_features(np_embeddings[:, :TASK_PROFILE_LENGTH - 1])  # Normalize costs
+    np_embeddings[:, EMBED_ID_COLUMNS] = normalize_task_ids(np_embeddings[:, EMBED_ID_COLUMNS])
+    np_embeddings[:, EMBED_TIME_COLUMNS] = normalize_times(np_embeddings[:, EMBED_TIME_COLUMNS])
+
     return np_embeddings
 
 
