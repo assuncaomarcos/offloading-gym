@@ -48,6 +48,7 @@ class RandomDAGGenerator(Workload):
 
     def random_daggen_params(self):
         return {
+            "rng": self.np_random,
             "num_tasks": self.num_tasks,
             "density": random.choice(self.densities),
             "fat": random.choice(self.fat_values),
@@ -56,7 +57,7 @@ class RandomDAGGenerator(Workload):
             "jump": random.choice(self.jumps),
         }
 
-    def step(self, offset=1) -> List[Optional[TaskGraph]]:
+    def step(self, *, offset: Optional[int] = 1) -> List[Optional[TaskGraph]]:
         self.current_time += offset
         return [self.random_task_graph()]
 

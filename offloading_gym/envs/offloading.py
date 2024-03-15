@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from typing import Union, Optional, Tuple, List, Any, NamedTuple, Callable
+from typing import Union, Optional, Tuple, List, Any, Callable, SupportsFloat
+from numpy.typing import NDArray
 
 import gymnasium as gym
 import numpy as np
@@ -15,6 +16,10 @@ from ..task_graph import TaskGraph, TaskAttr
 from ..utils import arrays
 from ..workload import Workload
 
+__all__ = [
+    'OffloadingEnv'
+]
+
 # Number of downstream/upstream tasks considered when encoding a task graph
 SUCCESSOR_TASKS = PREDECESSOR_TASKS = 6
 TASK_PROFILE_LENGTH = 5
@@ -24,12 +29,7 @@ EMBED_ID_COLUMNS = [0] + list(range(TASK_PROFILE_LENGTH, TASK_PROFILE_LENGTH + P
 EMBED_TIME_COLUMNS = list(range(1, TASK_PROFILE_LENGTH))
 
 
-class OffloadingState(NamedTuple):
-    graph_embedding: np.ndarray
-    scheduling_plan: np.ndarray
-
-
-class TaskProfileEncoder(Callable[[TaskAttr], List[float]]):
+class TaskCostEncoder(Callable[[TaskAttr], List[float]]):
     cluster: Cluster
 
     def __init__(self, cluster: Cluster):
@@ -53,6 +53,7 @@ class OffloadingEnv(BaseOffEnv):
     # Raw observation space = task_graph + scheduling plan
     observation_space: Union[gym.spaces.tuple.Tuple, gym.spaces.box.Box]
     action_space: gym.spaces.MultiBinary
+    graph_embedding: Union[NDArray, None]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -63,7 +64,7 @@ class OffloadingEnv(BaseOffEnv):
         self.workload = build_workload(self.workload_config)
         self.scheduler_config = kwargs.get('scheduler', DEFAULT_SCHEDULER_CONFIG)
         self.scheduler = build_scheduler(self.scheduler_config)
-        self.task_encoder = TaskProfileEncoder(self.scheduler.cluster)
+        self.task_encoder = TaskCostEncoder(self.scheduler.cluster)
         self.task_graph = None
         self.graph_embedding = None
 
@@ -101,27 +102,30 @@ class OffloadingEnv(BaseOffEnv):
         *,
         seed: Optional[int] = None,
         options: Optional[dict] = None,
-    ) -> Tuple[OffloadingState, dict[str, Any]]:
+    ) -> Tuple[NDArray[np.float32], dict[str, Any]]:
         super().reset(seed=seed)
-        self.task_graph = self.workload.step(offset=0)[0]            # Use only the first task graph
+        self.workload.reset(seed=seed)
+
+        # Use only the first task graph
+        self.task_graph = self.workload.step(offset=0)[0]
         compute_task_ranks(self.scheduler.cluster, self.task_graph)
         self.graph_embedding = task_embeddings(task_graph=self.task_graph, task_encoder=self.task_encoder)
+        return self._get_ob(), {}
 
-        # return self.state, {}
+    def _get_ob(self):
+        s = self.state
+        assert s is not None, "Call reset before using OffloadingEnv."
+        return self.graph_embedding
 
-    def step(self, action: int) -> Tuple[OffloadingState, dict[str, Any]]:
-        task_graphs = self.workload.step(offset=1)
-
-
-    # def _get_obs(self):
-    #     return {"agent": self._agent_location, "target": self._target_location}
+    def step(
+            self,
+            action: NDArray[np.int8]
+    ) -> Tuple[NDArray[np.float32], SupportsFloat, bool, bool, dict[str, Any]]:
+        pass
 
     @property
-    def state(self):
-        pass
-        # return OffloadingState(
-        #     task_graph=self.tasks_per_app, TASK_PROFILE_LENGTH))
-        # )
+    def state(self) -> NDArray[np.float32]:
+        return self.graph_embedding
 
 
 def compute_task_ranks(cluster: Cluster, task_graph: TaskGraph):

@@ -27,6 +27,14 @@ class Cluster(object):
         self.user_devices = DiscreteProfile(num_user_devices)
         self.comm_link = ContinuousProfile(comm_link_mbps)
 
+    def _reset_resources(self):
+        self.edge_resources.remove_past_entries(0)
+        self.user_devices.remove_past_entries(0)
+        self.comm_link.remove_past_entries(0.0)
+
+    def reset(self):
+        self._reset_resources()
+
     @property
     def num_edge_resources(self) -> int:
         return self.edge_resources.max_capacity

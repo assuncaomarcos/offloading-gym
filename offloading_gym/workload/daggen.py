@@ -2,29 +2,27 @@
 # -*- coding: utf-8 -*-
 
 """
-This module generates Directed Acyclic Graphs (DAGs) based on parameters like task number,
-networking features, and Communication to Computation Ratio (CCR). This is useful in
+This module generates Directed Acyclic Graphs (DAGs) based on parameters such as task number,
+networking features, and Communication to Computation Ratio (CCR). This is useful for
 simulating task scheduling in parallel and distributed systems.
 
-This module is based on daggen random `graph generator <https://github.com/frs69wq/daggen>` _
-proposed by Suter & Hunold and the changes proposed by Arabnejad and Barbosa.
-For more details, see the article below:
+The module is based on the daggen random graph generator proposed by Suter & Hunold,
+with modifications by Arabnejad and Barbosa. For more details, see the article below:
 
-H. Arabnejad and J. Barbosa, List Scheduling Algorithm for Heterogeneous Systems by
-an Optimistic Cost Table, IEEE Transactions on Parallel and Distributed Systems,
-Vol. 25, N. 3, March 2014.
+H. Arabnejad and J. Barbosa, 'List Scheduling Algorithm for Heterogeneous Systems by
+an Optimistic Cost Table', IEEE Transactions on Parallel and Distributed Systems,
+Vol. 25, No. 3, March 2014.
 
-This module uses Python's singleton pseudo-random number generator and Numpy to generate
-random numbers. To ensure reproducibility, you should seed these before generating DAGs.
-For conviency, the function `seed` exposed by this module seeds Python's and Numpy's
-random number generators.
+This module utilizes NumPy's random number generator to produce random numbers.
+To ensure reproducibility, you can provide a specific random number generator when
+generating a random DAG. If none is provided, a module-level random number generator,
+created with a random seed, will be used.
 
 Example:
     >>> from random import random
     >>> import networkx as nx
     >>> from offloading_gym.workload import daggen
     >>>
-    >>> daggen.seed(42)
     >>> graph = daggen.random_dag(num_tasks=20, ccr=0.5)
     >>> print(graph)
     DiGraph with 20 nodes and 25 edges
@@ -33,11 +31,10 @@ Example:
 import math
 from networkx import DiGraph
 from dataclasses import dataclass
-from typing import List, Any
-import random
+from typing import List, Any, Optional
 import numpy as np
 
-__all__ = ["random_dag", "seed"]
+__all__ = ["random_dag"]
 
 
 # Default values for generated DAGs
@@ -47,7 +44,7 @@ REGULARITY = 0.5
 DENSITY = 0.6
 JUMP_SIZE = 1
 CCR = 0.3
-MIN_DATA = 5120  # Data sizes of 5KB - 50KB
+MIN_DATA = 5120          # Data sizes of 5KB - 50KB
 MAX_DATA = 51200
 MIN_COMPUTATION = 10**7  # Each task requires between 10^7 and 10^8 cycles
 MAX_COMPUTATION = 10**8
@@ -64,20 +61,19 @@ class TaskInfo:
     children: List[Any]
 
 
-def seed(random_seed: int) -> None:
-    """Sets the random seed for the random number generators."""
-    random.seed(random_seed)
-    np.random.seed(random_seed)
+_rng = np.random.default_rng()
 
 
-def random_int_in_range(num, range_percent: float) -> int:
+def random_int_in_range(rng: np.random.Generator, num: float, range_percent: float) -> int:
     """Generates a random integer within a range around a specified number."""
-    r = -range_percent + (2 * range_percent * random.random())
+    r = -range_percent + (2 * range_percent * rng.random())
     return max(1, int(num * (1.0 + r / 100.00)))
 
 
 def scale_array(
-    input_array: List[float], min_val: float, max_val: float
+        input_array: List[float],
+        min_val: float,
+        max_val: float
 ) -> List[float]:
     np_array = np.array(input_array)
     min_arr = np.amin(np_array)
@@ -87,7 +83,12 @@ def scale_array(
 
 
 def create_tasks(
-    n_tasks: int, fat: float, regularity: float, min_comp: int, max_comp: int
+        rng: np.random.Generator,
+        n_tasks: int,
+        fat: float,
+        regularity: float,
+        min_comp: int,
+        max_comp: int
 ) -> List[List[TaskInfo]]:
     # Compute the number of tasks per level
     n_tasks_per_level = int(fat * math.sqrt(n_tasks))
@@ -96,13 +97,13 @@ def create_tasks(
 
     while total_tasks < n_tasks:
         n_tasks_at_level = min(
-            random_int_in_range(n_tasks_per_level, 100.0 - 100.0 * regularity),
+            random_int_in_range(rng, n_tasks_per_level, 100.0 - 100.0 * regularity),
             n_tasks - total_tasks,
         )
         tasks_at_level = [
             TaskInfo(
                 task_id=task_id,
-                computing_cost=random.randint(min_comp, max_comp),
+                computing_cost=rng.integers(low=min_comp, high=max_comp, endpoint=True),
                 data_cost=0,
                 n_children=0,
                 children=[],
@@ -115,7 +116,12 @@ def create_tasks(
     return tasks
 
 
-def create_dependencies(tasks: List[List[TaskInfo]], density: float, jump: int) -> None:
+def create_dependencies(
+        rng: np.random.Generator,
+        tasks: List[List[TaskInfo]],
+        density: float,
+        jump: int
+) -> None:
     n_levels = len(tasks)
 
     # For all levels but the last one
@@ -124,14 +130,14 @@ def create_dependencies(tasks: List[List[TaskInfo]], density: float, jump: int) 
             # Compute how many parents the task should have
             n_tasks_upper_level = len(tasks[level - 1])
             n_parents = min(
-                1 + int(random.uniform(0.0, density * n_tasks_upper_level)),
+                1 + int(rng.uniform(0.0, density * n_tasks_upper_level)),
                 n_tasks_upper_level,
             )
 
             for _ in range(n_parents):
                 # compute the level of the parent
-                parent_level = max(0, level - int(random.uniform(1.0, jump + 1)))
-                parent_idx = int(random.uniform(0, len(tasks[parent_level])))
+                parent_level = max(0, level - int(rng.uniform(1.0, jump + 1)))
+                parent_idx = int(rng.uniform(0, len(tasks[parent_level])))
                 parent = tasks[parent_level][parent_idx]
 
                 n_tasks_at_level = child_idx = 0
@@ -195,26 +201,29 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
 
 
 def random_dag(
-    num_tasks: int = NUM_TASKS,
-    fat: float = FAT,
-    density: float = DENSITY,
-    regularity: float = REGULARITY,
-    jump: int = JUMP_SIZE,
-    ccr: float = CCR,
-    min_comp: int = MIN_COMPUTATION,
-    max_comp: int = MAX_COMPUTATION,
-    min_data: int = MIN_DATA,
-    max_data: int = MAX_DATA,
+        *,
+        rng: Optional[np.random.Generator] = None,
+        num_tasks: Optional[int] = NUM_TASKS,
+        fat: Optional[float] = FAT,
+        density: Optional[float] = DENSITY,
+        regularity: Optional[float] = REGULARITY,
+        jump: Optional[int] = JUMP_SIZE,
+        ccr: Optional[float] = CCR,
+        min_comp: Optional[int] = MIN_COMPUTATION,
+        max_comp: Optional[int] = MAX_COMPUTATION,
+        min_data: Optional[int] = MIN_DATA,
+        max_data: Optional[int] = MAX_DATA,
 ) -> DiGraph:
     """Generates a random task DAG.
 
     Args:
-        num_tasks: the number of tasks in the DAG.
-        fat: the fatness factor of the DAG.
-        density: the density factor of the dependencies between tasks.
-        regularity: the regularity factor of the DAG.
-        jump: the jump size for creating dependencies between tasks.
-        ccr: the communication-to-computation ratio.
+        rng: the Numpy random number generator to use.
+        num_tasks: the number of tasks in the DAG. Default is 20.
+        fat: the fatness factor of the DAG. Default is 0.7.
+        density: the density factor of the dependencies between tasks. Default is 0.6.
+        regularity: the regularity factor of the DAG. Default is 0.5.
+        jump: the jump size for creating dependencies between tasks. Default is 1.
+        ccr: the communication-to-computation ratio. Default is 0.3.
         min_comp: the minimum computation cost for tasks.
         max_comp: the maximum computation cost for tasks.
         min_data: the minimum data size for tasks' communication costs.
@@ -240,14 +249,18 @@ def random_dag(
         0 <= min_data <= max_data
     ), "min_data must be smaller than max_data, and both must be greater than 0"
 
+    if rng is None:
+        rng = _rng
+
     tasks = create_tasks(
+        rng=rng,
         n_tasks=num_tasks,
         fat=fat,
         regularity=regularity,
         min_comp=min_comp,
         max_comp=max_comp,
     )
-    create_dependencies(tasks, density, jump)
+    create_dependencies(rng, tasks, density, jump)
     set_communication_costs(tasks, ccr, min_data, max_data)
     task_graph = create_task_graph(tasks)
     return task_graph

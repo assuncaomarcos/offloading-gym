@@ -6,14 +6,14 @@ import unittest
 from offloading_gym.workload import RandomDAGGenerator
 from offloading_gym.envs.workload import RANDOM_WORKLOAD_CONFIG
 from ..workload import daggen
-import random
+import numpy as np
 
 
 class TestDaggen(unittest.TestCase):
     """Tests the DAG generator."""
 
     def setUp(self) -> None:
-        random.seed(42)
+        self.rng = np.random.default_rng(42)
 
     def test_daggen(self):
         task_graph = daggen.random_dag(num_tasks=20)
@@ -30,7 +30,7 @@ class TestDaggen(unittest.TestCase):
         dags = []  # to store the DAGs
 
         for v, n in zip(values, num_tasks):
-            dags.append(daggen.random_dag(num_tasks=n, density=v, fat=v, ccr=0.8, jump=2))
+            dags.append(daggen.random_dag(rng=self.rng, num_tasks=n, density=v, fat=v, ccr=0.8, jump=2))
 
         for dag, num_task in zip(dags, num_tasks):
             self.assertEqual(len(dag.nodes), num_task)
@@ -40,7 +40,6 @@ class TestWorkload(unittest.TestCase):
     """Tests the workload generator."""
 
     def setUp(self) -> None:
-        random.seed(42)
         self.num_tasks = RANDOM_WORKLOAD_CONFIG["num_tasks"]
         self.workload = RandomDAGGenerator(**RANDOM_WORKLOAD_CONFIG)
 

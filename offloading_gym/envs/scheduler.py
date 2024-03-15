@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from typing import List
+
+from numpy.typing import NDArray
+import numpy as np
 
 from ..scheduler import Scheduler
+from ..task_graph import TaskAttr
 
 DEFAULT_SCHEDULER_CONFIG = {
     "type": "fifo_scheduler",
@@ -14,9 +19,13 @@ DEFAULT_SCHEDULER_CONFIG = {
 
 
 class DefaultScheduler(Scheduler):
+    _energy_use: float
 
-    def schedule_tasks(self, tasks):
-        pass
+    def compute_schedule(self, tasks: List[TaskAttr], action: NDArray[np.int8]):
+        self.cluster.reset()
+        for action, task_attr in zip(action, tasks):
+            #TODO: Check the order of tasks here, whether the array index is really needed
+            pass
 
     @staticmethod
     def build(**kwargs):
@@ -30,3 +39,76 @@ def build_scheduler(scheduler_config: dict):
         return DefaultScheduler.build(**kwargs)
     else:
         raise RuntimeError(f'Unsupported scheduler type {scheduler_type}')
+
+
+    # def get_scheduling_cost_step_by_step(self, plan, task_graph):
+    #     cloud_available_time = 0.0
+    #     ws_available_time = 0.0
+    #     local_available_time = 0.0
+    #     task_number = task_graph.number_of_tasks
+    #
+    #     time_local = [0] * task_number      # run time on local processor
+    #     time_ul = [0] * task_number         # run time on sending channel
+    #     time_dl = [0] * task_number         # run time on receiving channel
+    #
+    #     ft_cloud = [0] * task_number        # finish time on cloud for each task
+    #     ft_ws = [0] * task_number           # finish time on sending channel for each task
+    #     ft_local = [0] * task_number        # local finish time for each task
+    #     ft_wr = [0] * task_number           # finish time in the receiving channel for each task
+    #
+    #     current_ft = total_energy = 0.0
+    #     return_latency, return_energy = [], []
+    #
+    #     for item in plan:
+    #         task_idx = item[0]
+    #         task = task_graph.tasks[task_idx]
+    #         action = item[1]
+    #
+    #         # Local execution
+    #         if action == 0:
+    #             # Compute the local finish time
+    #             _, time_local[task_idx], ft_local[task_idx] = self.compute_times(
+    #                 task_idx, task_graph, task, local_available_time,
+    #                 self.resource_cluster.locally_execution_cost, ft_local, ft_wr
+    #             )
+    #
+    #             local_available_time = ft_local[task_idx]
+    #             task_finish_time = ft_local[task_idx]
+    #             energy_consumption = self.compute_local_energy(time_local[task_idx])
+    #
+    #         # Offloading
+    #         else:
+    #
+    #             # Compute the remote finish time
+    #             _, time_ul[task_idx], ft_ws[task_idx] = self.compute_times(
+    #                 task_idx, task_graph, task, ws_available_time,
+    #                 self.resource_cluster.up_transmission_cost, ft_local, ft_ws
+    #             )
+    #             ws_available_time = ft_ws[task_idx]
+    #
+    #             cloud_start_time = cloud_available_time
+    #             if not len(task_graph.predecessors[task_idx]):
+    #                 cloud_start_time = max(cloud_available_time, ft_ws[task_idx])
+    #
+    #             # TODO: Not sure whether it's the processing or transmission data size
+    #             _, _, ft_cloud[task_idx] = self.compute_times(
+    #                 task_idx, task_graph, task, cloud_start_time,
+    #                 self.resource_cluster.mec_execution_cost, ft_cloud, ft_ws
+    #             )
+    #             cloud_available_time = ft_cloud[task_idx]
+    #             wr_start_time = cloud_available_time
+    #
+    #             time_dl[task_idx] = self.resource_cluster.dl_transmission_cost(task.trans_datasize)
+    #             ft_wr[task_idx] = wr_start_time + time_dl[task_idx]
+    #             task_finish_time = ft_wr[task_idx]
+    #             energy_consumption = self.compute_offloading_energy(time_ul[task_idx], self.ptx + time_dl[task_idx])
+    #
+    #         current_ft = max(task_finish_time, current_ft)
+    #         total_energy += energy_consumption
+    #         delta_make_span = max(task_finish_time, current_ft) - current_ft
+    #         delta_energy = energy_consumption
+    #
+    #         return_latency.append(delta_make_span)
+    #         return_energy.append(delta_energy)
+    #
+    #     return return_latency, return_energy, current_ft, total_energy

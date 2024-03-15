@@ -15,8 +15,7 @@ class TestOffloadingEnv(unittest.TestCase):
                 'tasks_per_app': 20
             },
         )
-        env.seed(5)
-        _ = env.reset()
+        _ = env.reset(seed=5)
     #     # action = 0
     #     # done = False
     #     # while not done:

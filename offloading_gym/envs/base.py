@@ -1,22 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import random
-import numpy as np
 from abc import ABC, abstractmethod
 
 import gymnasium as gym
 from gymnasium.utils import EzPickle
+from gymnasium.core import ObsType, ActType
 
 
 TASKS_PER_APPLICATION = 20
 
-__all__ = [
-    "BaseOffEnv"
-]
 
-
-class BaseOffEnv(ABC, gym.Env, EzPickle):
+class BaseOffEnv(ABC, gym.Env[ObsType, ActType], EzPickle):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
     tasks_per_app: int
 
@@ -37,14 +32,6 @@ class BaseOffEnv(ABC, gym.Env, EzPickle):
     def _render_state(self):
         pass
 
-    @staticmethod
-    def seed(seed=None):
-        if seed is None:
-            seed = random.randint(0, 99999999)
-        np.random.seed(seed)        # In case some other library uses numpy
-        random.seed(seed)
-        return [seed]
-
     @property
     @abstractmethod
     def state(self):
@@ -53,4 +40,3 @@ class BaseOffEnv(ABC, gym.Env, EzPickle):
     @property
     def reward(self):
         raise NotImplementedError
-
