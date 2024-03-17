@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from typing import Any, Dict
+from typing import Any, Tuple
 from collections.abc import Mapping, Set
 
 from networkx import DiGraph
@@ -12,7 +12,9 @@ from functools import cached_property
 __all__ = [
     'TaskAttr',
     'TaskGraph',
-    'EdgeAttr'
+    'EdgeAttr',
+    'EdgeTuple',
+    'TaskTuple'
 ]
 
 
@@ -89,3 +91,5 @@ class TaskGraph(DiGraph):
     edge_attr_dict_factory = EdgeAttr
 
 
+TaskTuple = Tuple[int, TaskAttr]
+EdgeTuple = Tuple[int, EdgeAttr]

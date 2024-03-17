@@ -8,17 +8,13 @@ from gymnasium.utils import EzPickle
 from gymnasium.core import ObsType, ActType
 
 
-TASKS_PER_APPLICATION = 20
-
 
 class BaseOffEnv(ABC, gym.Env[ObsType, ActType], EzPickle):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
-    tasks_per_app: int
 
     @abstractmethod
     def __init__(self, **kwargs):
         EzPickle.__init__(self, **kwargs)
-        self.tasks_per_app = kwargs.get("tasks_per_app", TASKS_PER_APPLICATION)
         self.renderer = kwargs.get("renderer", None)
 
     def render(self, mode='human'):

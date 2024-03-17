@@ -7,4 +7,4 @@ black~=24.2.0
 pyglet>=2.0.12
 matplotlib>=3.8.3
 jax>=0.4.25
-availability-profile~=0.0.1
+simpy~=4.1.1
