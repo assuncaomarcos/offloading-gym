@@ -3,18 +3,18 @@
 
 from typing import Union, Optional, Tuple, List, Any, Callable, SupportsFloat
 from numpy.typing import NDArray
+from functools import cached_property
 
 import gymnasium as gym
 import numpy as np
 import networkx as nx
 
 from .base import BaseOffEnv
-from .scheduler import build_scheduler, DEFAULT_SCHEDULER_CONFIG
 from .workload import build_workload, RANDOM_WORKLOAD_CONFIG
-from offloading_gym.simulator.cluster import Cluster
 from ..task_graph import TaskGraph, TaskAttr, TaskTuple
 from ..utils import arrays
 from ..workload import Workload
+from ..simulator import Cluster, Simulator, TaskExecution
 
 
 __all__ = [
@@ -23,13 +23,21 @@ __all__ = [
 
 TASKS_PER_APPLICATION = 20
 
-# Number of downstream/upstream tasks considered when encoding a task graph
-SUCCESSOR_TASKS = PREDECESSOR_TASKS = 6
+# Number of embedding fields containing task properties
 TASK_PROFILE_LENGTH = 5
 
-# Columns of the graph embedding that contain task ids and times
-EMBED_ID_COLUMNS = [0] + list(range(TASK_PROFILE_LENGTH, TASK_PROFILE_LENGTH + PREDECESSOR_TASKS + SUCCESSOR_TASKS))
-EMBED_TIME_COLUMNS = list(range(1, TASK_PROFILE_LENGTH))
+# Number of downstream/upstream tasks considered when encoding a task graph
+TASK_SUCCESSORS = TASK_PREDECESSORS = 6
+
+# Columns of the graph embedding that contain task tims and IDs
+TASK_TIME_COLUMNS = list(range(1, TASK_PROFILE_LENGTH))
+TASK_ID_COLUMNS = [0] + list(
+    range(
+        TASK_PROFILE_LENGTH,
+        TASK_PROFILE_LENGTH + TASK_PREDECESSORS + TASK_SUCCESSORS
+    )
+)
+
 
 DEFAULT_CLUSTER_CONFIG = {
     "num_edge_cpus": 10,
@@ -61,16 +69,15 @@ class OffloadingEnv(BaseOffEnv):
     cluster: Cluster
     tasks_per_app: int
 
-    task_graph_space: Optional[gym.spaces.Box]
-    scheduling_plan_space: Optional[gym.spaces.MultiBinary]
-
-    # Raw observation space = task_graph + scheduling plan
-    observation_space: Union[gym.spaces.tuple.Tuple, gym.spaces.box.Box]
+    observation_space: gym.spaces.Tuple
     action_space: gym.spaces.MultiBinary
-    graph_embedding: Union[NDArray, None]
 
     # Current task graph
     task_graph: Union[TaskGraph, None]
+
+    # A numpy array containing the encoded task graph
+    scheduling_plan: NDArray[np.int8]
+    graph_embedding: Union[NDArray, None]
 
     # Tasks sorted for scheduling for avoiding having to sort them multiple times
     task_list: Union[List[TaskTuple], None]
@@ -78,7 +85,6 @@ class OffloadingEnv(BaseOffEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.tasks_per_app = kwargs.get("tasks_per_app", TASKS_PER_APPLICATION)
-        self.use_raw_state = kwargs.get("use_raw_state", True)
         self._setup_spaces()
         self._build_simulation_elements(kwargs)
         self.task_graph = None
@@ -94,45 +100,31 @@ class OffloadingEnv(BaseOffEnv):
 
     def _setup_spaces(self):
         self.action_space = gym.spaces.MultiBinary(self.tasks_per_app)
-        self.setup_raw_state() if self.use_raw_state else self.setup_image_state()
 
-    def setup_raw_state(self):
-        self.task_graph_space = gym.spaces.Box(
-            low=-1.0, high=1.0,
-            shape=(
-                self.tasks_per_app,
-                TASK_PROFILE_LENGTH + SUCCESSOR_TASKS + PREDECESSOR_TASKS
-            )
-        )
-
-        self.scheduling_plan_space = gym.spaces.MultiBinary(self.tasks_per_app)
-
-        self.observation_space = gym.spaces.Tuple(
-            (self.task_graph_space, self.scheduling_plan_space)
-        )
-
-    def setup_image_state(self):
-        self.observation_space = gym.spaces.Box(
+        scheduling_plan_space = gym.spaces.MultiBinary(self.tasks_per_app)
+        task_embedding_space = gym.spaces.Box(
             low=-1.0,
             high=1.0,
             shape=(
                 self.tasks_per_app,
-                TASK_PROFILE_LENGTH + SUCCESSOR_TASKS + PREDECESSOR_TASKS,
+                TASK_PROFILE_LENGTH + TASK_SUCCESSORS + TASK_PREDECESSORS,
             ),
         )
+        self.observation_space = gym.spaces.Tuple((scheduling_plan_space, task_embedding_space))
 
     def reset(
         self,
         *,
         seed: Optional[int] = None,
         options: Optional[dict] = None,
-    ) -> Tuple[NDArray[np.float32], dict[str, Any]]:
+    ) -> Tuple[Tuple[NDArray[np.int8], NDArray[np.float32]], dict[str, Any]]:
         super().reset(seed=seed)
         self.workload.reset(seed=seed)
 
         # Use only the first task graph
         self.task_graph = self.workload.step(offset=0)[0]
         self.compute_task_ranks(self.cluster, self.task_graph)
+        self.scheduling_plan = np.zeros(shape=(self.tasks_per_app,), dtype=np.int8)
 
         topo_order = nx.lexicographical_topological_sort(
             self.task_graph, key=lambda task_id: self.task_graph.nodes[task_id]["rank"]
@@ -152,18 +144,45 @@ class OffloadingEnv(BaseOffEnv):
     def _get_ob(self):
         s = self.state
         assert s is not None, "Call reset before using OffloadingEnv."
-        return self.graph_embedding
+        return self.scheduling_plan, self.graph_embedding
 
     def step(
             self,
             action: NDArray[np.int8]
-    ) -> Tuple[NDArray[np.float32], SupportsFloat, bool, bool, dict[str, Any]]:
-        # self.scheduler.add_tasks(self.task_list)
+    ) -> Tuple[Tuple[NDArray[np.int8], NDArray[np.float32]], SupportsFloat, bool, bool, dict[str, Any]]:
+        self.scheduling_plan = action
+        action_execution = Simulator.build(self.cluster).simulate(self.task_list, action.tolist())
+        local_execution = Simulator.build(self.cluster).simulate(self.task_list, self.all_local_action)
+
+        return self._get_ob(), 0.0, True, True, {}
+
+    def compute_reward(
+            self,
+            action_execution: List[TaskExecution],
+            local_execution: List[TaskExecution]
+    ):
         pass
 
+    @staticmethod
+    def score_func_qoe(cost, all_local_cost, number_of_task):
+        try:
+            cost = np.array(cost)
+            avg_all_local_cost = all_local_cost / float(number_of_task)
+            score = -(cost - avg_all_local_cost) / all_local_cost
+        except:
+            print("exception all local cost: ", all_local_cost)
+            print("exception cost: ", cost)
+            raise ValueError("Unsupported operation")
+
+        return score
+
+    @cached_property
+    def all_local_action(self):
+        return [0] * self.tasks_per_app
+
     @property
-    def state(self) -> NDArray[np.float32]:
-        return self.graph_embedding
+    def state(self) -> Tuple[NDArray[np.int8], NDArray[np.float32]]:
+        return self.scheduling_plan, self.graph_embedding
 
     @staticmethod
     def compute_task_ranks(cluster: Cluster, task_graph: TaskGraph):
@@ -211,8 +230,8 @@ class OffloadingEnv(BaseOffEnv):
             encoded_task = task_encoder(task_attr)
             task_info.append(
                 encoded_task
-                + arrays.pad_list(lst=task_predecessors, target_length=PREDECESSOR_TASKS, pad_value=-1.0)
-                + arrays.pad_list(lst=task_successors, target_length=SUCCESSOR_TASKS, pad_value=-1.0)
+                + arrays.pad_list(lst=task_predecessors, target_length=TASK_PREDECESSORS, pad_value=-1.0)
+                + arrays.pad_list(lst=task_successors, target_length=TASK_SUCCESSORS, pad_value=-1.0)
             )
 
         def normalize_task_ids(dependencies: np.ndarray) -> np.ndarray:
@@ -226,7 +245,7 @@ class OffloadingEnv(BaseOffEnv):
             return (features - features.min()) / (features.max() - features.min())
 
         embeddings = np.array(task_info, dtype=np.float32)
-        embeddings[:, EMBED_ID_COLUMNS] = normalize_task_ids(embeddings[:, EMBED_ID_COLUMNS])
-        embeddings[:, EMBED_TIME_COLUMNS] = normalize_times(embeddings[:, EMBED_TIME_COLUMNS])
+        embeddings[:, TASK_ID_COLUMNS] = normalize_task_ids(embeddings[:, TASK_ID_COLUMNS])
+        embeddings[:, TASK_TIME_COLUMNS] = normalize_times(embeddings[:, TASK_TIME_COLUMNS])
 
         return embeddings

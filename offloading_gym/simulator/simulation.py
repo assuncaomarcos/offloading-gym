@@ -19,6 +19,8 @@ class ExecutionType(IntEnum):
 class TaskExecution:
     task_id: int
     finish_time: float
+    make_span: float
+    execution_type: ExecutionType
 
 
 class Simulator:
@@ -46,16 +48,30 @@ class Simulator:
     def execute_local(self, task: TaskAttr):
         with self.local_device.request() as req:
             yield req
+            start_time = self.sim_env.now
             yield self.sim_env.timeout(self.cluster.local_execution_time(task.processing_demand))
-            self.task_info[task.task_id] = TaskExecution(task_id=task.task_id, finish_time=self.sim_env.now)
+            finish_time = self.sim_env.now
+            self.task_info[task.task_id] = TaskExecution(
+                task_id=task.task_id,
+                finish_time=finish_time,
+                make_span=finish_time - start_time,
+                execution_type=ExecutionType.LOCAL
+            )
 
     def execute_remote(self, task: TaskAttr):
         with self.edge_server.request() as req:
             yield req
+            start_time = self.sim_env.now
             yield self.sim_env.process(self.upload(task.task_size))
             yield self.sim_env.timeout(self.cluster.edge_execution_time(task.processing_demand))
             yield self.sim_env.process(self.download(task.output_datasize))
-            self.task_info[task.task_id] = TaskExecution(task_id=task.task_id, finish_time=self.sim_env.now)
+            finish_time = self.sim_env.now
+            self.task_info[task.task_id] = TaskExecution(
+                task_id=task.task_id,
+                finish_time=finish_time,
+                make_span=finish_time - start_time,
+                execution_type=ExecutionType.EDGE
+            )
 
     def task_manager(self, tasks: List[TaskTuple], scheduling_plan: List[int]):
         for task, action in zip(tasks, scheduling_plan):
