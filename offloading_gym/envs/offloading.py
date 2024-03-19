@@ -3,7 +3,7 @@
 
 from typing import Union, Optional, Tuple, List, Any, Callable, SupportsFloat, Dict
 from numpy.typing import NDArray
-from functools import cached_property, reduce
+from functools import cached_property
 
 import gymnasium as gym
 import numpy as np
@@ -159,10 +159,10 @@ class OffloadingEnv(BaseOffEnv):
             self.task_list,
             self.all_local_action
         )
-        scores = self._make_span_scores(action_execution, local_execution)
+        scores = self._latency_scores(action_execution, local_execution)
         return self._get_ob(), np.mean(scores), True, True, {}
 
-    def _make_span_scores(
+    def _latency_scores(
             self,
             action_execution: List[TaskExecution],
             local_execution: List[TaskExecution]

@@ -8,7 +8,6 @@ from gymnasium.utils import EzPickle
 from gymnasium.core import ObsType, ActType
 
 
-
 class BaseOffEnv(ABC, gym.Env[ObsType, ActType], EzPickle):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
