@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from typing import Union, Optional, Tuple, List, Any, Callable, SupportsFloat
+from typing import Union, Optional, Tuple, List, Any, Callable, SupportsFloat, Dict
 from numpy.typing import NDArray
-from functools import cached_property
+from functools import cached_property, reduce
 
 import gymnasium as gym
 import numpy as np
@@ -149,32 +149,29 @@ class OffloadingEnv(BaseOffEnv):
     def step(
             self,
             action: NDArray[np.int8]
-    ) -> Tuple[Tuple[NDArray[np.int8], NDArray[np.float32]], SupportsFloat, bool, bool, dict[str, Any]]:
+    ) -> Tuple[Tuple[NDArray[np.int8], NDArray[np.float32]], SupportsFloat, bool, bool, Dict[str, Any]]:
         self.scheduling_plan = action
-        action_execution = Simulator.build(self.cluster).simulate(self.task_list, action.tolist())
-        local_execution = Simulator.build(self.cluster).simulate(self.task_list, self.all_local_action)
+        action_execution = Simulator.build(self.cluster).simulate(
+            self.task_list,
+            action.tolist()
+        )
+        local_execution = Simulator.build(self.cluster).simulate(
+            self.task_list,
+            self.all_local_action
+        )
+        scores = self._make_span_scores(action_execution, local_execution)
+        return self._get_ob(), np.mean(scores), True, True, {}
 
-        return self._get_ob(), 0.0, True, True, {}
-
-    def compute_reward(
+    def _make_span_scores(
             self,
             action_execution: List[TaskExecution],
             local_execution: List[TaskExecution]
-    ):
-        pass
-
-    @staticmethod
-    def score_func_qoe(cost, all_local_cost, number_of_task):
-        try:
-            cost = np.array(cost)
-            avg_all_local_cost = all_local_cost / float(number_of_task)
-            score = -(cost - avg_all_local_cost) / all_local_cost
-        except:
-            print("exception all local cost: ", all_local_cost)
-            print("exception cost: ", cost)
-            raise ValueError("Unsupported operation")
-
-        return score
+    ) -> NDArray[np.float32]:
+        ms_plan = np.array([task_execution.make_span for task_execution in action_execution])
+        ms_local = np.array([task_execution.make_span for task_execution in local_execution])
+        avg_ms_local = ms_local / float(self.tasks_per_app)
+        scores = -(ms_plan - avg_ms_local) / ms_local
+        return scores
 
     @cached_property
     def all_local_action(self):

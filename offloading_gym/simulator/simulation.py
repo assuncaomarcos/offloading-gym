@@ -7,7 +7,6 @@ from ..task_graph import TaskAttr, TaskTuple
 from typing import List, Dict
 from enum import IntEnum
 from dataclasses import dataclass
-from collections import OrderedDict
 
 
 class ExecutionType(IntEnum):
@@ -28,7 +27,7 @@ class Simulator:
     sim_env: simpy.Environment
     local_device: simpy.Resource
     edge_server: simpy.Resource
-    task_info: OrderedDict[int, TaskExecution]
+    task_info: List[TaskExecution]
 
     def __init__(self, cluster: Cluster):
         self.sim_env = simpy.Environment()
@@ -37,7 +36,7 @@ class Simulator:
         # Assuming one task at a time for now to be compliant with the MRLCO paper
         self.edge_server = simpy.Resource(self.sim_env, capacity=1)
         self.local_device = simpy.Resource(self.sim_env, capacity=1)
-        self.task_info = OrderedDict()
+        self.task_info = []
 
     def upload(self, data_size):
         yield self.sim_env.timeout(self.cluster.upload_time(data_size))
@@ -51,11 +50,13 @@ class Simulator:
             start_time = self.sim_env.now
             yield self.sim_env.timeout(self.cluster.local_execution_time(task.processing_demand))
             finish_time = self.sim_env.now
-            self.task_info[task.task_id] = TaskExecution(
-                task_id=task.task_id,
-                finish_time=finish_time,
-                make_span=finish_time - start_time,
-                execution_type=ExecutionType.LOCAL
+            self.task_info.append(
+                TaskExecution(
+                    task_id=task.task_id,
+                    finish_time=finish_time,
+                    make_span=finish_time - start_time,
+                    execution_type=ExecutionType.LOCAL
+                )
             )
 
     def execute_remote(self, task: TaskAttr):
@@ -66,11 +67,13 @@ class Simulator:
             yield self.sim_env.timeout(self.cluster.edge_execution_time(task.processing_demand))
             yield self.sim_env.process(self.download(task.output_datasize))
             finish_time = self.sim_env.now
-            self.task_info[task.task_id] = TaskExecution(
-                task_id=task.task_id,
-                finish_time=finish_time,
-                make_span=finish_time - start_time,
-                execution_type=ExecutionType.EDGE
+            self.task_info.append(
+                TaskExecution(
+                    task_id=task.task_id,
+                    finish_time=finish_time,
+                    make_span=finish_time - start_time,
+                    execution_type=ExecutionType.EDGE
+                )
             )
 
     def task_manager(self, tasks: List[TaskTuple], scheduling_plan: List[int]):
@@ -81,7 +84,7 @@ class Simulator:
             else:
                 yield self.sim_env.process(self.execute_local(task_attr))
 
-    def simulate(self, tasks: List[TaskTuple], scheduling_plan: List[int]) -> Dict[int, TaskExecution]:
+    def simulate(self, tasks: List[TaskTuple], scheduling_plan: List[int]) -> List[TaskExecution]:
         self.sim_env.process(self.task_manager(tasks, scheduling_plan))
         self.sim_env.run()
         return self.task_info
