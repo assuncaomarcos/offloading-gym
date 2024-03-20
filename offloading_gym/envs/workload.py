@@ -15,10 +15,10 @@ RANDOM_WORKLOAD_CONFIG = {
     "max_computing": 1.0e8,
     "min_datasize": 5120,           # Each task produces between 5KB and 50KB of data
     "max_datasize": 51200,
-    "density_values": [0.2, 0.8],
+    "density_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
     "regularity_values": [0.2, 0.5, 0.8],
-    "fat_values": [0.1, 0.4, 0.8],
-    "ccr_values": [0.1, 0.5, 0.8],
+    "fat_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+    "ccr_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
     "jump_values": [1, 2, 4],
 }
 

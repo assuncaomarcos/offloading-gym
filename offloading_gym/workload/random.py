@@ -73,7 +73,7 @@ class RandomDAGGenerator(Workload):
                     TaskAttr(
                         task_id=node_id,
                         processing_demand=data["processing_demand"],
-                        task_size=data["output_datasize"],
+                        task_size=data["output_datasize"],      # We consider tasks to have the same input/output sizes
                         output_datasize=data["output_datasize"],
                     ),
                 )
@@ -97,4 +97,4 @@ class RandomDAGGenerator(Workload):
         return self.length
 
     def peek(self):
-        return self.step(0)
+        return self.step(offset=0)

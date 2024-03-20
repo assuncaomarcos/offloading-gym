@@ -82,9 +82,14 @@ class OffloadingEnv(BaseOffEnv):
     # Tasks sorted for scheduling for avoiding having to sort them multiple times
     task_list: Union[List[TaskTuple], None]
 
+    # To truncate episodes
+    max_episode_steps: Union[int, None]
+    steps: int = 0
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.tasks_per_app = kwargs.get("tasks_per_app", TASKS_PER_APPLICATION)
+        self.max_episode_steps = kwargs.get("max_episode_steps", None)
         self._setup_spaces()
         self._build_simulation_elements(kwargs)
         self.task_graph = None
@@ -120,6 +125,7 @@ class OffloadingEnv(BaseOffEnv):
     ) -> Tuple[Tuple[NDArray[np.int8], NDArray[np.float32]], dict[str, Any]]:
         super().reset(seed=seed)
         self.workload.reset(seed=seed)
+        self.steps = 0
 
         # Use only the first task graph
         self.task_graph = self.workload.step(offset=0)[0]
@@ -151,6 +157,7 @@ class OffloadingEnv(BaseOffEnv):
             action: NDArray[np.int8]
     ) -> Tuple[Tuple[NDArray[np.int8], NDArray[np.float32]], SupportsFloat, bool, bool, Dict[str, Any]]:
         self.scheduling_plan = action
+        self.steps += 1
         action_execution = Simulator.build(self.cluster).simulate(
             self.task_list,
             action.tolist()
@@ -160,7 +167,8 @@ class OffloadingEnv(BaseOffEnv):
             self.all_local_action
         )
         scores = self._latency_scores(action_execution, local_execution)
-        return self._get_ob(), np.mean(scores), True, True, {}
+        truncate = self.max_episode_steps is not None and self.steps >= self.max_episode_steps
+        return self._get_ob(), np.mean(scores), False, truncate, {}
 
     def _latency_scores(
             self,
