@@ -84,7 +84,7 @@ class OffloadingEnv(BaseOffEnv):
 
     # To truncate episodes
     max_episode_steps: Union[int, None]
-    steps: int = 0
+    steps: int
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -95,6 +95,7 @@ class OffloadingEnv(BaseOffEnv):
         self.task_graph = None
         self.graph_embedding = None
         self.task_list = None
+        self.steps = 0
 
     def _build_simulation_elements(self, kwargs):
         workload_config = kwargs.get('workload', RANDOM_WORKLOAD_CONFIG)

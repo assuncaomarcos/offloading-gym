@@ -4,7 +4,7 @@
 import simpy
 from .cluster import Cluster
 from ..task_graph import TaskAttr, TaskTuple
-from typing import List, Dict
+from typing import List
 from enum import IntEnum
 from dataclasses import dataclass
 

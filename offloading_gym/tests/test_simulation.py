@@ -28,20 +28,21 @@ class TestSimulation(unittest.TestCase):
         sorted_tasks = [(node, task_graph.nodes[node]) for node in topo_order]
         task_info = Simulator.build(self.cluster).simulate(sorted_tasks, [1, 0, 1, 0])
         self.assertEqual(len(task_info), 4)
-        self.assertEqual(task_info[0].finish_time, 3.0)
-        self.assertEqual(task_info[1].finish_time, 4.0)
-        self.assertEqual(task_info[2].finish_time, 7.0)
-        self.assertEqual(task_info[3].finish_time, 8.0)
+        finish_times = [3.0, 4.0, 7.0, 8.0]
+        for idx, ft in zip(range(4), finish_times):
+            self.assertEqual(task_info[idx].finish_time, ft)
 
     def test_diamond_dag(self):
         task_graph = self._generate_diamond_dag()
         topo_order = nx.topological_sort(task_graph)
         sorted_tasks = [(node, task_graph.nodes[node]) for node in topo_order]
         task_info = Simulator.build(self.cluster).simulate(sorted_tasks, [1, 0, 1, 0])
-        self.assertEqual(task_info[0].finish_time, 3.0)
-        self.assertEqual(task_info[1].finish_time, 4.0)
-        self.assertEqual(task_info[2].finish_time, 7.0)
-        self.assertEqual(task_info[3].finish_time, 8.0)
+        finish_times = [3.0, 4.0, 7.0, 8.0]
+        for idx, ft in zip(range(4), finish_times):
+            self.assertEqual(task_info[idx].finish_time, ft)
+
+    def pause_simulation(self):
+        pass
 
     @staticmethod
     def _generate_pipeline() -> TaskGraph:
