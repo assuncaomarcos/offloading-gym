@@ -35,9 +35,8 @@ class Simulator:
         self.sim_env = simpy.Environment()
         self.cluster = cluster
 
-        # Assuming one task at a time for now to be compliant with the MRLCO paper
-        self.edge_server = simpy.Resource(self.sim_env, capacity=1)
-        self.local_device = simpy.Resource(self.sim_env, capacity=1)
+        self.edge_server = simpy.Resource(self.sim_env, capacity=self.cluster.num_edge_cpus)
+        self.local_device = simpy.Resource(self.sim_env, capacity=self.cluster.num_local_cpus)
         self.task_info = []
         self.running_simulation_process = None
 

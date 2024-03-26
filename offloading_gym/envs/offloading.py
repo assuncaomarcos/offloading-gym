@@ -40,16 +40,15 @@ TASK_ID_COLUMNS = [0] + list(
 
 
 DEFAULT_CLUSTER_CONFIG = {
-    "num_edge_cpus": 10,
-    "edge_cpu_capacity": 1024 * 1024,
+    "num_edge_cpus": 1,
+    "edge_cpu_capacity": 4 * 10 ** 9,
     "num_local_cpus": 1,
-    "local_cpu_capacity": 1024 * 1024,
+    "local_cpu_capacity": 10 ** 9,
     "upload_rate": 1,
     "download_rate": 1,
-    "power_upload": 1.258,
-    "power_download": 1.181,
-    "power_local_computing": 1.25 * 10 ** -26,
-    "power_edge_computing": 0   # The DRLTO paper does not the energy consumed by edge computing
+    "power_tx": 1.258,
+    "power_rx": 1.181,
+    "power_cpu": 1.25
 }
 
 

@@ -34,20 +34,22 @@ class Cluster:
         - `local_cpu_capacity`: A float representing the capacity of each CPU in the user device.
         - `upload_rate`: A float representing the upload communication rate from device to server in Mbps.
         - `download_rate`: A float representing the download communication from edge server to device in Mbps.
-        - `power_upload`: The power in watts when uploading data.
-        - `power_download`: The power in watts when downloading data.
-        - `power_local_computing`: The power in watts when executing a task on local devices.
-        - `power_edge_computing`: The power in watts when executing a task on an edge server.
+        - `power_tx`: Transmitting power constant in watts of the wifi channel.
+        - `power_rx`: Receiving power constant in watts of the wifi channel.
+        - `power_cpu`: Computational power in watts of a user device's CPU.
     """
     edge_cpu_capacity: float
     num_local_cpus: int
     local_cpu_capacity: float
     upload_rate: float
     download_rate: float
-    power_upload: float
-    power_download: float
-    power_local_computing: float
-    power_edge_computing: float
+
+    # Constants used by the energy consumption model as in Quang Dinh et al. Offloading in Mobile Edge Computing: Task
+    # Allocation and Computational Frequency Scaling, IEEE Transactions on Communications, Vol. 65, No. 8, August 2017
+    power_tx: float
+    power_rx: float
+    power_rho: float
+    power_zeta: float = 3
 
     def __init__(
             self,
@@ -58,10 +60,9 @@ class Cluster:
             local_cpu_capacity: float,
             upload_rate: float,
             download_rate: float,
-            power_upload: float,
-            power_download: float,
-            power_local_computing: float,
-            power_edge_computing: float
+            power_tx: float,
+            power_rx: float,
+            power_cpu: float
     ):
         self.num_edge_cpus = num_edge_cpus
         self.edge_cpu_capacity = edge_cpu_capacity
@@ -69,10 +70,9 @@ class Cluster:
         self.local_cpu_capacity = local_cpu_capacity
         self.upload_rate = upload_rate
         self.download_rate = download_rate
-        self.power_upload = power_upload
-        self.power_download = power_download
-        self.power_local_computing = power_local_computing
-        self.power_edge_computing = power_edge_computing
+        self.power_tx = power_tx
+        self.power_rx = power_rx
+        self.power_rho = power_cpu / local_cpu_capacity ** self.power_zeta
 
     def edge_execution_time(self, num_fps: int) -> float:
         """
@@ -94,11 +94,11 @@ class Cluster:
         return (num_bytes * 8 / BITS_IN_MEGABIT) / self.download_rate
 
     def energy_local_execution(self, task: TaskAttr) -> float:
-        return self.power_local_computing * self.local_execution_time(task.processing_demand)
+        runtime = self.local_execution_time(task.processing_demand)
+        return self.power_rho * (self.local_cpu_capacity ** self.power_zeta) * runtime
 
     def energy_offloading(self, task: TaskAttr) -> float:
         return (
-                self.power_upload * self.upload_time(task.task_size) +
-                self.power_edge_computing * self.edge_execution_time(task.processing_demand) +
-                self.power_download * self.download_time(task.output_datasize)
+                self.power_tx * self.upload_time(task.task_size) +
+                self.power_rx * self.download_time(task.output_datasize)
         )

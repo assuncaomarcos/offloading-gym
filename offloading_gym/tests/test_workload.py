@@ -44,11 +44,11 @@ class TestWorkload(unittest.TestCase):
         self.workload = RandomDAGGenerator(**RANDOM_WORKLOAD_CONFIG)
 
     def test_create_taskgraph(self):
-        task_graph = self.workload.step(1)[0]
+        task_graph = self.workload.step(offset=1)[0]
         self.assertEqual(len(task_graph.nodes), self.num_tasks)
 
     def test_successors(self):
-        task_graph = self.workload.step(1)[0]
+        task_graph = self.workload.step(offset=1)[0]
         successors = task_graph.succ
         # self.assertEqual(successors[1][2]['datasize'], 809)
 

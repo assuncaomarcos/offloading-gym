@@ -3,7 +3,7 @@ import networkx as nx
 from ..simulator import Cluster, Simulator
 from ..task_graph import TaskAttr, EdgeAttr, TaskGraph
 
-CPU_UNIT = 1024 * 1024          # It takes one second to execute a task
+CPU_UNIT = 10 ** 9              # It takes one second to execute a task
 DATA_UNIT = int(10 ** 6 / 8)    # To ensure it takes one second to transfer it over the channel
 
 
@@ -16,7 +16,10 @@ class TestSimulation(unittest.TestCase):
             num_local_cpus=1,
             local_cpu_capacity=CPU_UNIT,
             upload_rate=1,
-            download_rate=1
+            download_rate=1,
+            power_rx=1.25,
+            power_tx=1.25,
+            power_cpu=1.25
         )
 
     def test_build(self):
