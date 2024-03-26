@@ -4,7 +4,7 @@
 import simpy
 from .cluster import Cluster
 from ..task_graph import TaskAttr, TaskTuple
-from typing import List
+from typing import List, Union
 from enum import IntEnum
 from dataclasses import dataclass
 
@@ -19,6 +19,7 @@ class TaskExecution:
     task_id: int
     finish_time: float
     make_span: float
+    energy: float
     execution_type: ExecutionType
 
 
@@ -28,6 +29,7 @@ class Simulator:
     local_device: simpy.Resource
     edge_server: simpy.Resource
     task_info: List[TaskExecution]
+    running_simulation_process: Union[simpy.Event, None]
 
     def __init__(self, cluster: Cluster):
         self.sim_env = simpy.Environment()
@@ -37,6 +39,7 @@ class Simulator:
         self.edge_server = simpy.Resource(self.sim_env, capacity=1)
         self.local_device = simpy.Resource(self.sim_env, capacity=1)
         self.task_info = []
+        self.running_simulation_process = None
 
     def upload(self, data_size):
         yield self.sim_env.timeout(self.cluster.upload_time(data_size))
@@ -55,6 +58,7 @@ class Simulator:
                     task_id=task.task_id,
                     finish_time=finish_time,
                     make_span=finish_time - start_time,
+                    energy=self.cluster.energy_local_execution(task),
                     execution_type=ExecutionType.LOCAL
                 )
             )
@@ -72,6 +76,7 @@ class Simulator:
                     task_id=task.task_id,
                     finish_time=finish_time,
                     make_span=finish_time - start_time,
+                    energy=self.cluster.energy_offloading(task),
                     execution_type=ExecutionType.EDGE
                 )
             )
@@ -84,9 +89,18 @@ class Simulator:
             else:
                 yield self.sim_env.process(self.execute_local(task_attr))
 
-    def simulate(self, tasks: List[TaskTuple], scheduling_plan: List[int]) -> List[TaskExecution]:
-        self.sim_env.process(self.task_manager(tasks, scheduling_plan))
-        self.sim_env.run()
+    def simulate(
+            self,
+            tasks: List[TaskTuple],
+            scheduling_plan: List[int]
+    ) -> List[TaskExecution]:
+        self.running_simulation_process = self.sim_env.process(self.task_manager(tasks, scheduling_plan))
+
+        try:
+            self.sim_env.run(until=self.running_simulation_process)
+        except simpy.Interrupt as interrupt:
+            print(f"Simulation interrupted: {interrupt.cause}")
+
         return self.task_info
 
     @staticmethod

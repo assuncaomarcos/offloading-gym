@@ -2,4 +2,4 @@
 # -*- coding: utf-8 -*-
 
 from .cluster import Cluster
-from .simulation import Simulator, TaskExecution
+from .simulation import Simulator, TaskExecution, ExecutionType

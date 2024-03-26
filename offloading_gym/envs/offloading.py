@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from typing import Union, Optional, Tuple, List, Any, Callable, SupportsFloat, Dict
+from typing import Union, Optional, Tuple, List, Any, Callable, Dict
 from numpy.typing import NDArray
 from functools import cached_property
 
@@ -45,7 +45,11 @@ DEFAULT_CLUSTER_CONFIG = {
     "num_local_cpus": 1,
     "local_cpu_capacity": 1024 * 1024,
     "upload_rate": 1,
-    "download_rate": 1
+    "download_rate": 1,
+    "power_upload": 1.258,
+    "power_download": 1.181,
+    "power_local_computing": 1.25 * 10 ** -26,
+    "power_edge_computing": 0   # The DRLTO paper does not the energy consumed by edge computing
 }
 
 
@@ -156,7 +160,7 @@ class OffloadingEnv(BaseOffEnv):
     def step(
             self,
             action: NDArray[np.int8]
-    ) -> Tuple[Tuple[NDArray[np.int8], NDArray[np.float32]], SupportsFloat, bool, bool, Dict[str, Any]]:
+    ) -> Tuple[Tuple[NDArray[np.int8], NDArray[np.float32]], np.float32, bool, bool, Dict[str, Any]]:
         self.scheduling_plan = action
         self.steps += 1
         action_execution = Simulator.build(self.cluster).simulate(
