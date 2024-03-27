@@ -8,14 +8,20 @@ class TestOffloadingEnv(unittest.TestCase):
 
     def setUp(self) -> None:
         self.rng = np.random.default_rng(42)
+        np.set_printoptions(suppress=True)
 
-    def test_instantiation_with_gym(self):
+    def test_env_instantiation(self):
         try:
-            gym.make('BinaryOffload-v0')
+            gym.make(
+                'BinaryOffload-v0',
+                **{
+                    'tasks_per_app': 30
+                },
+            )
         except gym.error.Error as error:
             self.fail(f"Unexpected error: {error}")
 
-    def test_environment_reset(self):
+    def test_env_reset(self):
         env = gym.make(
             "BinaryOffload-v0",
             **{
@@ -27,18 +33,15 @@ class TestOffloadingEnv(unittest.TestCase):
         action = env.action_space.sample()
         env.step(action)
 
-    #     # action = 0
-    #     # done = False
-    #     # while not done:
-    #     #     _, _, done, _ = env.step(action)
-    #     # self.assertTrue(done)
-
-    # def test_runtimes(self):
-    #     env: OffloadingEnv = gym.make(  # type: ignore
-    #             "Offloading-v0",
-    #             **{
-    #                 'use_raw_state': True,
-    #                 'tasks_per_app': 20
-    #             },
-    #         )
-    #     tasks = task_minimum_runtimes()
+    def test_vector_env(self):
+        num_envs = 3
+        envs = gym.make_vec(
+            'BinaryOffload-v0',
+            num_envs=num_envs,
+            **{
+                'tasks_per_app': 30
+            },
+        )
+        self.assertEqual(envs.action_space.shape[0], num_envs)
+        self.assertEqual(envs.action_space.shape[1], 30)
+        obs_list, _ = envs.reset(seed=5)
