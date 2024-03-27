@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-This module contains classes used to represent the computing infrastructure as per the MRLCO paper.
+This module contains classes used to represent the computing infrastructure as per the MRLCO/DRLTO papers.
 
        +-------------+      Upload       +------------+
        |             | ----------------> |            |
@@ -23,29 +23,34 @@ BITS_IN_MEGABIT = 10 ** 6
 
 
 class Cluster:
-    num_edge_cpus: int
     """
-    The `Cluster` class represents a cluster of computing resources, consisting of an edge server and a user device.
+    Represents a cluster of computational resources comprising an edge server and a user device.
+    
+    The power model and its constraints are described in the following paper:
+     
+    Quang Dinh et al., "Offloading in Mobile Edge Computing: Task Allocation and Computational Frequency Scaling",
+    IEEE Transactions on Communications, Vol. 65, No. 8, August 2017
 
     Attributes:
-        - `num_edge_cpus`: An integer representing the number of available CPUs in the edge server.
-        - `edge_cpu_capacity`: A float representing the capacity of each CPU in the edge server.
-        - `num_local_cpus`: An integer representing the number of available CPUs in the user device.
-        - `local_cpu_capacity`: A float representing the capacity of each CPU in the user device.
-        - `upload_rate`: A float representing the upload communication rate from device to server in Mbps.
-        - `download_rate`: A float representing the download communication from edge server to device in Mbps.
-        - `power_tx`: Transmitting power constant in watts of the wifi channel.
-        - `power_rx`: Receiving power constant in watts of the wifi channel.
-        - `power_cpu`: Computational power in watts of a user device's CPU.
+        num_edge_cpus (int): The number of available CPUs in the edge server
+        edge_cpu_capacity (float): The capacity of each CPU in the edge server, measured in FLOPS
+        num_local_cpus (int): The number of available CPUs in the user's computing device
+        local_cpu_capacity (float): The processing capacity of each CPU in the user's device, measured in FLOPS
+        upload_rate (float): The data upload rate from the device to the server, measured in Mbps
+        download_rate (float): The data download rate from the server to the device, measured in Mbps
+        power_tx (float): The power consumption for data transmission over the wireless channel, measured in watts
+        power_rx (float): The power consumption for data reception over the wireless channel, measured in watts
+        power_rho (float): A constant that depends on the average switched capacitance and the average activity factor
+        power_zeta (float) is a constant (usually close to 3)
     """
+
+    num_edge_cpus: int
     edge_cpu_capacity: float
     num_local_cpus: int
     local_cpu_capacity: float
     upload_rate: float
     download_rate: float
 
-    # Constants used by the energy consumption model as in Quang Dinh et al. Offloading in Mobile Edge Computing: Task
-    # Allocation and Computational Frequency Scaling, IEEE Transactions on Communications, Vol. 65, No. 8, August 2017
     power_tx: float
     power_rx: float
     power_rho: float
@@ -94,10 +99,12 @@ class Cluster:
         return (num_bytes * 8 / BITS_IN_MEGABIT) / self.download_rate
 
     def energy_local_execution(self, task: TaskAttr) -> float:
+        """ Computes the energy consumption of a task on a user device """
         runtime = self.local_execution_time(task.processing_demand)
         return self.power_rho * (self.local_cpu_capacity ** self.power_zeta) * runtime
 
     def energy_offloading(self, task: TaskAttr) -> float:
+        """ Computes the energy consumption of a task when offloaded """
         return (
                 self.power_tx * self.upload_time(task.task_size) +
                 self.power_rx * self.download_time(task.output_datasize)

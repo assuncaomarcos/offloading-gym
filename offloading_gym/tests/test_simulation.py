@@ -1,6 +1,6 @@
 import unittest
 import networkx as nx
-from ..simulator import Cluster, Simulator
+from ..simulation import Cluster, Simulator
 from ..task_graph import TaskAttr, EdgeAttr, TaskGraph
 
 CPU_UNIT = 10 ** 9              # It takes one second to execute a task

@@ -6,7 +6,7 @@
 from gymnasium.envs.registration import register
 
 register(
-    id="Offloading-v0",
-    entry_point="offloading_gym.envs.offloading:OffloadingEnv",
+    id="BinaryOffload-v0",
+    entry_point="offloading_gym.envs.drlto.offload_env:BinaryOffloadEnv",
     max_episode_steps=100
 )

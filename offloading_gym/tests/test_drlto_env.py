@@ -1,7 +1,7 @@
 import unittest
 import gymnasium as gym
+import gymnasium.error
 import numpy as np
-from ..envs.offloading import OffloadingEnv
 
 
 class TestOffloadingEnv(unittest.TestCase):
@@ -10,11 +10,14 @@ class TestOffloadingEnv(unittest.TestCase):
         self.rng = np.random.default_rng(42)
 
     def test_instantiation_with_gym(self):
-        gym.make('Offloading-v0')
+        try:
+            gym.make('BinaryOffload-v0')
+        except gym.error.Error as error:
+            self.fail(f"Unexpected error: {error}")
 
     def test_environment_reset(self):
-        env: OffloadingEnv = gym.make(  # type: ignore
-            "Offloading-v0",
+        env = gym.make(
+            "BinaryOffload-v0",
             **{
                 'tasks_per_app': 20
             },

@@ -9,16 +9,16 @@ import gymnasium as gym
 import numpy as np
 import networkx as nx
 
-from .base import BaseOffEnv
-from .workload import build_workload, RANDOM_WORKLOAD_CONFIG
-from ..task_graph import TaskGraph, TaskAttr, TaskTuple
-from ..utils import arrays
-from ..workload import Workload
-from ..simulator import Cluster, Simulator, TaskExecution
+from offloading_gym.envs.base import BaseOffEnv
+from offloading_gym.envs.workload import build_workload, RANDOM_WORKLOAD_CONFIG
+from offloading_gym.task_graph import TaskGraph, TaskAttr, TaskTuple
+from offloading_gym.utils import arrays
+from offloading_gym.workload import Workload
+from offloading_gym.simulation import Cluster, Simulator, TaskExecution
 
 
 __all__ = [
-    'OffloadingEnv'
+    'BinaryOffloadEnv'
 ]
 
 TASKS_PER_APPLICATION = 20
@@ -66,7 +66,7 @@ class TaskCostEncoder(Callable[[TaskAttr], List[float]]):
         return [float(task.task_id), local_exec_cost, upload_cost, edge_exec_cost, download_cost]
 
 
-class OffloadingEnv(BaseOffEnv):
+class BinaryOffloadEnv(BaseOffEnv):
     use_raw_state: bool
     workload: Workload
     cluster: Cluster
