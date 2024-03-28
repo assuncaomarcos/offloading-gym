@@ -5,7 +5,7 @@
 This module provides a Gymnasium environment, `BinaryEnv`, designed for training
 Deep Reinforcement Learning (DRL) algorithms that will offload tasks from local devices to edge servers.
 
-The environment employs a workload generator to facilitate the development of applications.
+The environment employs a workload generator to facilitate creating sample applications.
 These applications are structured as Directed Acyclic Graphs (DAGs), where nodes represent
 tasks and edges symbolize data interdependencies.
 
@@ -17,12 +17,12 @@ The implementation of this environment aligns with the descriptions in the follo
 - Wang, Jin et al. "Fast adaptive task offloading in edge computing based on meta reinforcement learning."
   IEEE Transactions on Parallel and Distributed Systems 32, no. 1 (2020): 242-253.
 
-Contrary to the above research, this environment dynamically creates task graphs using a workload generator.
-The workload structure follows the patterns used in the papers above. The workload generator
-furthermore allows for customization to suit various users' needs.
+Contrary to the above research, this workload generator dynamically creates task graphs whose
+structure follow the patterns used in the papers above. The workload generator furthermore allows for
+customization to suit various users' needs.
 
-The workload formation concept is based on the daggen random graph generator suggested by Suter & Hunold.
-Modifications to the generator are incorporated from the following paper:
+The workload generation is based on the daggen random graph generator suggested by Suter & Hunold
+with modifications from the following paper:
 
 - H. Arabnejad and J. Barbosa. "List Scheduling Algorithm for Heterogeneous Systems by
   an Optimistic Cost Table." IEEE Transactions on Parallel and Distributed Systems,
@@ -36,10 +36,9 @@ The `BinaryEnv` environment mimics a simple computing infrastructure:
        |             | <---------------- |            |
        +-------------+      Download     +------------+
 
-The infrastructure where the task graphs are scheduled includes a user device connected
-to an edge server. Tasks can be offloaded from the device to the server. These resources are
-interlinked by a network connection with distinct capacities for upload (device to edge server) and
-download (edge server to device).
+This infrastructure includes a user device connected to an edge server. Tasks can be offloaded
+from the device to the server. These resources are interlinked by a network connection with
+distinct capacities for upload (device to edge server) and download (edge server to device).
 """
 
 from typing import Union, Optional, Tuple, List, Any, Callable, Dict
@@ -49,6 +48,7 @@ from functools import cached_property
 import gymnasium as gym
 import numpy as np
 import networkx as nx
+import math
 
 from offloading_gym.envs.base import BaseOffEnv
 from offloading_gym.envs.workload import build_workload, RANDOM_WORKLOAD_CONFIG
@@ -128,6 +128,13 @@ class BinaryOffloadEnv(BaseOffEnv):
     # Tasks sorted for scheduling for avoiding having to sort them multiple times
     task_list: Union[List[TaskTuple], None]
 
+    # To keep the results of an all-local execution to compute the reward
+    local_execution: Union[List[TaskExecution], None]
+
+    # The weights of latency and energy (lambda's) for computing the rewards
+    weight_latency: float
+    weight_energy: float
+
     # To truncate episodes
     max_episode_steps: Union[int, None]
     steps: int
@@ -136,11 +143,18 @@ class BinaryOffloadEnv(BaseOffEnv):
         super().__init__(**kwargs)
         self.tasks_per_app = kwargs.get("tasks_per_app", TASKS_PER_APPLICATION)
         self.max_episode_steps = kwargs.get("max_episode_steps", None)
+
+        self.weight_latency = kwargs.get("weight_latency", 0.5)
+        self.weight_energy = kwargs.get("weight_energy", 0.5)
+        assert math.isclose(self.weight_latency + self.weight_energy, 1.0), \
+            "The sum of weight_latency and weight_energy must be 1.0"
+
         self._setup_spaces()
         self._build_simulation(kwargs)
         self.task_graph = None
         self.graph_embedding = None
         self.task_list = None
+        self.local_execution = None
         self.steps = 0
 
     def _build_simulation(self, kwargs):
@@ -185,6 +199,11 @@ class BinaryOffloadEnv(BaseOffEnv):
         # Store sorted tasks to avoid having to sort it multiple times
         self.task_list = [(node, self.task_graph.nodes[node]) for node in topo_order]
 
+        # Compute the execution times for a run where all tasks are executed locally
+        self.local_execution = Simulator.build(self.cluster).simulate(
+            self.task_list, self.all_local_action
+        )
+
         self.graph_embedding = self._task_embeddings(
             task_graph=self.task_graph,
             sorted_tasks=self.task_list,
@@ -210,33 +229,53 @@ class BinaryOffloadEnv(BaseOffEnv):
         action_execution = Simulator.build(self.cluster).simulate(
             self.task_list, action.tolist()
         )
-        local_execution = Simulator.build(self.cluster).simulate(
-            self.task_list, self.all_local_action
+        action_make_span = np.array(
+            [task_execution.make_span for task_execution in action_execution]
         )
-        scores = self._latency_scores(action_execution, local_execution)
+        action_energy = np.array(
+            [task_execution.energy for task_execution in action_execution]
+        )
+
+        scores_make_span = self._compute_scores(action_make_span, self.local_exec_make_span)
+        scores_energy = self._compute_scores(action_energy, self.local_exec_energy)
+        rewards = self.weight_latency * scores_make_span + self.weight_energy * scores_energy
+
         truncate = (
             self.max_episode_steps is not None and self.steps >= self.max_episode_steps
         )
-        return self._get_ob(), np.mean(scores), False, truncate, {}
 
-    def _latency_scores(
+        return (
+            self._get_ob(),
+            np.sum(rewards, axis=0),
+            False,
+            truncate,
+            {"rewards": rewards}
+        )
+
+    def _compute_scores(
         self,
-        action_execution: List[TaskExecution],
-        local_execution: List[TaskExecution],
+        action_results: NDArray[np.float32],
+        local_results: NDArray[np.float32],
     ) -> NDArray[np.float32]:
-        ms_plan = np.array(
-            [task_execution.make_span for task_execution in action_execution]
-        )
-        ms_local = np.array(
-            [task_execution.make_span for task_execution in local_execution]
-        )
-        avg_ms_local = ms_local / float(self.tasks_per_app)
-        scores = -(ms_plan - avg_ms_local) / ms_local
+        avg_local = local_results / float(self.tasks_per_app)
+        scores = -(action_results - avg_local) / local_results
         return scores
 
     @cached_property
     def all_local_action(self):
         return [0] * self.tasks_per_app
+
+    @property
+    def local_exec_make_span(self) -> NDArray[np.float32]:
+        return np.array(
+            [task_execution.make_span for task_execution in self.local_execution]
+        )
+
+    @property
+    def local_exec_energy(self) -> NDArray[np.float32]:
+        return np.array(
+            [task_execution.energy for task_execution in self.local_execution]
+        )
 
     @property
     def state(self) -> NDArray[np.float32]:
@@ -319,3 +358,4 @@ class BinaryOffloadEnv(BaseOffEnv):
         )
 
         return embeddings
+
