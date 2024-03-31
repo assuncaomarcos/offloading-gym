@@ -9,20 +9,20 @@ def pad_list(lst: List[Any], target_length: int, pad_value: float = -1.0):
     padding = target_length - len(lst)
     if padding > 0:
         lst.extend([pad_value] * padding)
-    return lst
+    return lst[:target_length]
 
 
 def pad_array(arr: np.ndarray, target_length: int, pad_value: float = -1.0):
     padding = target_length - len(arr)
     if padding > 0:
-        arr = np.pad(arr, (0, padding), 'constant', constant_values=(pad_value,))
-    return arr
+        arr = np.pad(arr, (0, padding), "constant", constant_values=(pad_value,))
+    return arr[:target_length]
 
 
 def merge_arrays(arrays, to_numpy_array=True):
     merged = []
     for arr in arrays:
-        merged += arr.tolist() if hasattr(arr, 'tolist') else arr
+        merged += arr.tolist() if hasattr(arr, "tolist") else arr
     return np.array([merged]) if to_numpy_array else [merged]
 
 
@@ -41,5 +41,3 @@ def binary_sequences(length):
         [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]]
     """
     return list(itertools.product([0, 1], repeat=length))
-
-

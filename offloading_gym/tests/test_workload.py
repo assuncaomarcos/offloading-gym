@@ -30,7 +30,11 @@ class TestDaggen(unittest.TestCase):
         dags = []  # to store the DAGs
 
         for v, n in zip(values, num_tasks):
-            dags.append(daggen.random_dag(rng=self.rng, num_tasks=n, density=v, fat=v, ccr=0.8, jump=2))
+            dags.append(
+                daggen.random_dag(
+                    rng=self.rng, num_tasks=n, density=v, fat=v, ccr=0.8, jump=2
+                )
+            )
 
         for dag, num_task in zip(dags, num_tasks):
             self.assertEqual(len(dag.nodes), num_task)

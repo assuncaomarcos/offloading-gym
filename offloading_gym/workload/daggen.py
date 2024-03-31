@@ -44,7 +44,7 @@ REGULARITY = 0.5
 DENSITY = 0.6
 JUMP_SIZE = 1
 CCR = 0.3
-MIN_DATA = 5120          # Data sizes of 5KB - 50KB
+MIN_DATA = 5120  # Data sizes of 5KB - 50KB
 MAX_DATA = 51200
 MIN_COMPUTATION = 10**7  # Each task requires between 10^7 and 10^8 cycles
 MAX_COMPUTATION = 10**8
@@ -64,16 +64,16 @@ class TaskInfo:
 _rng = np.random.default_rng()
 
 
-def random_int_in_range(rng: np.random.Generator, num: float, range_percent: float) -> int:
+def random_int_in_range(
+    rng: np.random.Generator, num: float, range_percent: float
+) -> int:
     """Generates a random integer within a range around a specified number."""
     r = -range_percent + (2 * range_percent * rng.random())
     return max(1, int(num * (1.0 + r / 100.00)))
 
 
 def scale_array(
-        input_array: List[float],
-        min_val: float,
-        max_val: float
+    input_array: List[float], min_val: float, max_val: float
 ) -> List[float]:
     np_array = np.array(input_array)
     min_arr = np.amin(np_array)
@@ -83,12 +83,12 @@ def scale_array(
 
 
 def create_tasks(
-        rng: np.random.Generator,
-        n_tasks: int,
-        fat: float,
-        regularity: float,
-        min_comp: int,
-        max_comp: int
+    rng: np.random.Generator,
+    n_tasks: int,
+    fat: float,
+    regularity: float,
+    min_comp: int,
+    max_comp: int,
 ) -> List[List[TaskInfo]]:
     # Compute the number of tasks per level
     n_tasks_per_level = int(fat * math.sqrt(n_tasks))
@@ -117,10 +117,7 @@ def create_tasks(
 
 
 def create_dependencies(
-        rng: np.random.Generator,
-        tasks: List[List[TaskInfo]],
-        density: float,
-        jump: int
+    rng: np.random.Generator, tasks: List[List[TaskInfo]], density: float, jump: int
 ) -> None:
     n_levels = len(tasks)
 
@@ -201,18 +198,18 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
 
 
 def random_dag(
-        *,
-        rng: Optional[np.random.Generator] = None,
-        num_tasks: Optional[int] = NUM_TASKS,
-        fat: Optional[float] = FAT,
-        density: Optional[float] = DENSITY,
-        regularity: Optional[float] = REGULARITY,
-        jump: Optional[int] = JUMP_SIZE,
-        ccr: Optional[float] = CCR,
-        min_comp: Optional[int] = MIN_COMPUTATION,
-        max_comp: Optional[int] = MAX_COMPUTATION,
-        min_data: Optional[int] = MIN_DATA,
-        max_data: Optional[int] = MAX_DATA,
+    *,
+    rng: Optional[np.random.Generator] = None,
+    num_tasks: Optional[int] = NUM_TASKS,
+    fat: Optional[float] = FAT,
+    density: Optional[float] = DENSITY,
+    regularity: Optional[float] = REGULARITY,
+    jump: Optional[int] = JUMP_SIZE,
+    ccr: Optional[float] = CCR,
+    min_comp: Optional[int] = MIN_COMPUTATION,
+    max_comp: Optional[int] = MAX_COMPUTATION,
+    min_data: Optional[int] = MIN_DATA,
+    max_data: Optional[int] = MAX_DATA,
 ) -> DiGraph:
     """Generates a random task DAG.
 

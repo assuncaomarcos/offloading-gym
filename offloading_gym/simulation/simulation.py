@@ -35,8 +35,12 @@ class Simulator:
         self.sim_env = simpy.Environment()
         self.cluster = cluster
 
-        self.edge_server = simpy.Resource(self.sim_env, capacity=self.cluster.num_edge_cpus)
-        self.local_device = simpy.Resource(self.sim_env, capacity=self.cluster.num_local_cpus)
+        self.edge_server = simpy.Resource(
+            self.sim_env, capacity=self.cluster.num_edge_cpus
+        )
+        self.local_device = simpy.Resource(
+            self.sim_env, capacity=self.cluster.num_local_cpus
+        )
         self.task_info = []
         self.running_simulation_process = None
 
@@ -50,7 +54,9 @@ class Simulator:
         with self.local_device.request() as req:
             yield req
             start_time = self.sim_env.now
-            yield self.sim_env.timeout(self.cluster.local_execution_time(task.processing_demand))
+            yield self.sim_env.timeout(
+                self.cluster.local_execution_time(task.processing_demand)
+            )
             finish_time = self.sim_env.now
             self.task_info.append(
                 TaskExecution(
@@ -58,7 +64,7 @@ class Simulator:
                     finish_time=finish_time,
                     make_span=finish_time - start_time,
                     energy=self.cluster.energy_local_execution(task),
-                    execution_type=ExecutionType.LOCAL
+                    execution_type=ExecutionType.LOCAL,
                 )
             )
 
@@ -67,7 +73,9 @@ class Simulator:
             yield req
             start_time = self.sim_env.now
             yield self.sim_env.process(self.upload(task.task_size))
-            yield self.sim_env.timeout(self.cluster.edge_execution_time(task.processing_demand))
+            yield self.sim_env.timeout(
+                self.cluster.edge_execution_time(task.processing_demand)
+            )
             yield self.sim_env.process(self.download(task.output_datasize))
             finish_time = self.sim_env.now
             self.task_info.append(
@@ -76,7 +84,7 @@ class Simulator:
                     finish_time=finish_time,
                     make_span=finish_time - start_time,
                     energy=self.cluster.energy_offloading(task),
-                    execution_type=ExecutionType.EDGE
+                    execution_type=ExecutionType.EDGE,
                 )
             )
 
@@ -89,11 +97,11 @@ class Simulator:
                 yield self.sim_env.process(self.execute_local(task_attr))
 
     def simulate(
-            self,
-            tasks: List[TaskTuple],
-            scheduling_plan: List[int]
+        self, tasks: List[TaskTuple], scheduling_plan: List[int]
     ) -> List[TaskExecution]:
-        self.running_simulation_process = self.sim_env.process(self.task_manager(tasks, scheduling_plan))
+        self.running_simulation_process = self.sim_env.process(
+            self.task_manager(tasks, scheduling_plan)
+        )
 
         try:
             self.sim_env.run(until=self.running_simulation_process)

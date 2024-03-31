@@ -139,15 +139,20 @@ class BinaryOffloadEnv(BaseOffEnv):
     max_episode_steps: Union[int, None]
     steps: int
 
+    # To indicate whether task ids should be normalized
+    normalize_task_ids: bool
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.tasks_per_app = kwargs.get("tasks_per_app", TASKS_PER_APPLICATION)
         self.max_episode_steps = kwargs.get("max_episode_steps", None)
+        self.normalize_task_ids = kwargs.get("normalize_task_ids", True)
 
         self.weight_latency = kwargs.get("weight_latency", 0.5)
         self.weight_energy = kwargs.get("weight_energy", 0.5)
-        assert math.isclose(self.weight_latency + self.weight_energy, 1.0), \
-            "The sum of weight_latency and weight_energy must be 1.0"
+        assert math.isclose(
+            self.weight_latency + self.weight_energy, 1.0
+        ), "The sum of weight_latency and weight_energy must be 1.0"
 
         self._setup_spaces()
         self._build_simulation(kwargs)
@@ -170,11 +175,11 @@ class BinaryOffloadEnv(BaseOffEnv):
         self.action_space = gym.spaces.MultiBinary(self.tasks_per_app)
         self.observation_space = gym.spaces.Box(
             low=-1.0,
-            high=1.0,
+            high=1.0 if self.normalize_task_ids else self.tasks_per_app,
             shape=(
                 self.tasks_per_app,
                 TASK_PROFILE_LENGTH + TASK_SUCCESSORS + TASK_PREDECESSORS,
-            )
+            ),
         )
 
     def reset(
@@ -208,6 +213,7 @@ class BinaryOffloadEnv(BaseOffEnv):
             task_graph=self.task_graph,
             sorted_tasks=self.task_list,
             task_encoder=self.task_encoder,
+            normalize_ids=self.normalize_task_ids
         )
 
         return self._get_ob(), {}
@@ -230,15 +236,19 @@ class BinaryOffloadEnv(BaseOffEnv):
             self.task_list, action.tolist()
         )
         action_make_span = np.array(
-            [task_execution.make_span for task_execution in action_execution]
+            [task_execution.make_span for task_execution in action_execution], dtype=np.float32
         )
         action_energy = np.array(
-            [task_execution.energy for task_execution in action_execution]
+            [task_execution.energy for task_execution in action_execution], dtype=np.float32
         )
 
-        scores_make_span = self._compute_scores(action_make_span, self.local_exec_make_span)
+        scores_make_span = self._compute_scores(
+            action_make_span, self.local_exec_make_span
+        )
         scores_energy = self._compute_scores(action_energy, self.local_exec_energy)
-        rewards = self.weight_latency * scores_make_span + self.weight_energy * scores_energy
+        rewards = (
+            self.weight_latency * scores_make_span + self.weight_energy * scores_energy
+        )
 
         truncate = (
             self.max_episode_steps is not None and self.steps >= self.max_episode_steps
@@ -249,7 +259,7 @@ class BinaryOffloadEnv(BaseOffEnv):
             np.sum(rewards, axis=0),
             False,
             truncate,
-            {"rewards": rewards}
+            {"rewards": rewards},
         )
 
     def _compute_scores(
@@ -268,13 +278,13 @@ class BinaryOffloadEnv(BaseOffEnv):
     @property
     def local_exec_make_span(self) -> NDArray[np.float32]:
         return np.array(
-            [task_execution.make_span for task_execution in self.local_execution]
+            [task_execution.make_span for task_execution in self.local_execution], dtype=np.float32
         )
 
     @property
     def local_exec_energy(self) -> NDArray[np.float32]:
         return np.array(
-            [task_execution.energy for task_execution in self.local_execution]
+            [task_execution.energy for task_execution in self.local_execution], dtype=np.float32
         )
 
     @property
@@ -320,24 +330,25 @@ class BinaryOffloadEnv(BaseOffEnv):
         task_graph: TaskGraph,
         sorted_tasks: List[TaskTuple],
         task_encoder: Callable[[TaskAttr], List[float]],
+        normalize_ids: bool = True
     ) -> np.ndarray:
         """Creates a list of task embeddings as per the MRLCO paper."""
         task_info = []
         for task_id, task_attr in sorted_tasks:
             task_predecessors = list(task_graph.pred[task_id].keys())
-            task_successors = list(task_graph.succ[task_id].keys())
-            encoded_task = task_encoder(task_attr)
-            task_info.append(
-                encoded_task
-                + arrays.pad_list(
-                    lst=task_predecessors,
-                    target_length=TASK_PREDECESSORS,
-                    pad_value=-1.0,
-                )
-                + arrays.pad_list(
-                    lst=task_successors, target_length=TASK_SUCCESSORS, pad_value=-1.0
-                )
+            task_predecessors = arrays.pad_list(
+                lst=task_predecessors,
+                target_length=TASK_PREDECESSORS,
+                pad_value=-1.0,
             )
+
+            task_successors = list(task_graph.succ[task_id].keys())
+            task_successors = arrays.pad_list(
+                lst=task_successors, target_length=TASK_SUCCESSORS, pad_value=-1.0
+            )
+
+            task_embedding = task_encoder(task_attr) + task_predecessors + task_successors
+            task_info.append(task_embedding)
 
         def normalize_task_ids(dependencies: np.ndarray) -> np.ndarray:
             mask = dependencies != -1
@@ -350,12 +361,14 @@ class BinaryOffloadEnv(BaseOffEnv):
             return (features - features.min()) / (features.max() - features.min())
 
         embeddings = np.array(task_info, dtype=np.float32)
-        embeddings[:, TASK_ID_COLUMNS] = normalize_task_ids(
-            embeddings[:, TASK_ID_COLUMNS]
-        )
+
+        if normalize_ids:
+            embeddings[:, TASK_ID_COLUMNS] = normalize_task_ids(
+                embeddings[:, TASK_ID_COLUMNS]
+            )
+
         embeddings[:, TASK_TIME_COLUMNS] = normalize_times(
             embeddings[:, TASK_TIME_COLUMNS]
         )
 
         return embeddings
-
