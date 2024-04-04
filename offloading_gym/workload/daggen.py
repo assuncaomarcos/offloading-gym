@@ -37,7 +37,7 @@ import numpy as np
 __all__ = ["random_dag"]
 
 
-# Default values for generated DAGs
+# Some sensible default values for DAGs representing IoT applications
 NUM_TASKS = 20
 FAT = 0.7
 REGULARITY = 0.5

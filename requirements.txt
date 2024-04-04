@@ -8,3 +8,4 @@ pyglet>=2.0.12
 matplotlib>=3.8.3
 jax>=0.4.25
 simpy~=4.1.1
+click~=8.1.7
