@@ -4,6 +4,7 @@
 """Registers the gymnasium environments."""
 
 from gymnasium.envs.registration import register
+from .base import BaseOffEnv
 
 register(
     id="BinaryOffload-v0",

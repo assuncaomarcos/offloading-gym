@@ -51,7 +51,7 @@ import networkx as nx
 import math
 
 from offloading_gym.envs.base import BaseOffEnv
-from offloading_gym.envs.workload import build_workload, RANDOM_WORKLOAD_CONFIG
+from offloading_gym.envs.workload import build_workload
 from offloading_gym.task_graph import TaskGraph, TaskAttr, TaskTuple
 from offloading_gym.utils import arrays
 from offloading_gym.workload import Workload
@@ -76,7 +76,6 @@ TASK_ID_COLUMNS = [0] + list(
     )
 )
 
-
 DEFAULT_CLUSTER_CONFIG = {
     "num_edge_cpus": 1,
     "edge_cpu_capacity": 4 * 10**9,
@@ -87,6 +86,20 @@ DEFAULT_CLUSTER_CONFIG = {
     "power_tx": 1.258,
     "power_rx": 1.181,
     "power_cpu": 1.25,
+}
+
+DEFAULT_WORKLOAD_CONFIG = {
+    "type": "random_dag",
+    "num_tasks": 20,  # Make sure this is set when using this config
+    "min_computing": 10**7,  # Each task requires between 10^7 and 10^8 cycles
+    "max_computing": 10**8,
+    "min_datasize": 5120,  # Each task produces between 5KB and 50KB of data
+    "max_datasize": 51200,
+    "density_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+    "regularity_values": [0.2, 0.5, 0.8],
+    "fat_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+    "ccr_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+    "jump_values": [1, 2, 4],
 }
 
 
@@ -163,7 +176,7 @@ class BinaryOffloadEnv(BaseOffEnv):
         self.steps = 0
 
     def _build_simulation(self, kwargs):
-        workload_config = kwargs.get("workload", RANDOM_WORKLOAD_CONFIG)
+        workload_config = kwargs.get("workload", DEFAULT_WORKLOAD_CONFIG)
         workload_config["num_tasks"] = self.tasks_per_app
         self.workload = build_workload(workload_config)
 
@@ -293,7 +306,7 @@ class BinaryOffloadEnv(BaseOffEnv):
 
     @staticmethod
     def _compute_task_ranks(cluster: Cluster, task_graph: TaskGraph):
-        """Computes the task ranks as per the MRLCO paper."""
+        """Computes the task ranks as per the MRLCO/DRLTO papers."""
         successors = task_graph.succ
 
         def task_runtime(task: TaskAttr) -> float:

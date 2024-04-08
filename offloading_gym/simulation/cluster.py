@@ -18,7 +18,6 @@ are separately provided.
 
 from ..task_graph import TaskAttr
 
-
 BITS_IN_MEGABIT = 10**6
 
 
