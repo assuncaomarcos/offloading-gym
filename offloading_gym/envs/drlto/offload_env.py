@@ -272,7 +272,11 @@ class BinaryOffloadEnv(BaseOffEnv):
             np.sum(rewards, axis=0),
             False,
             truncate,
-            {"rewards": rewards},
+            {
+                "task_rewards": rewards,
+                "task_energy": action_energy,
+                "task_graph": self.task_graph
+            },
         )
 
     def _compute_scores(
