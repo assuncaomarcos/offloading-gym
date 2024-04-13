@@ -18,7 +18,7 @@ class BaseOffEnv(ABC, gym.Env[ObsType, ActType], EzPickle):
 
     def render(self, mode='human'):
         if self.renderer is None:
-            from offloading_gym.envs.drlto.render import OffloadingRenderer
+            from offloading_gym.envs.render import OffloadingRenderer
 
             self.renderer = OffloadingRenderer(mode)
         rgb = self.renderer.render(self._render_state())
