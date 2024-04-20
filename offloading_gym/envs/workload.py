@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from ..workload import RandomDAGGenerator
+from offloading_gym.workload import RandomDAGGenerator
 
 __all__ = ["build_workload"]
 

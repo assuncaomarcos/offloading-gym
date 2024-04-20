@@ -3,26 +3,29 @@
 
 """
 This module provides a Gymnasium environment, `BinaryEnv`, designed for training
-Deep Reinforcement Learning (DRL) algorithms that will offload tasks from local devices to edge servers.
+Deep Reinforcement Learning (DRL) algorithms that will offload tasks from local
+devices to edge servers.
 
 The environment employs a workload generator to facilitate creating sample applications.
 These applications are structured as Directed Acyclic Graphs (DAGs), where nodes represent
 tasks and edges symbolize data interdependencies.
 
-The implementation of this environment aligns with the descriptions in the following research papers:
+The implementation of this environment aligns with the descriptions in the
+following research papers:
 
-- Wang, Jin et al. "Dependent task offloading for edge computing based on deep reinforcement learning."
-  IEEE Transactions on Computers 71, no. 10 (2021): 2449-2461.
+- Wang, Jin et al. "Dependent task offloading for edge computing based on deep
+  reinforcement learning." IEEE Transactions on Computers 71, no. 10 (2021): 2449-2461.
 
-- Wang, Jin et al. "Fast adaptive task offloading in edge computing based on meta reinforcement learning."
-  IEEE Transactions on Parallel and Distributed Systems 32, no. 1 (2020): 242-253.
+- Wang, Jin et al. "Fast adaptive task offloading in edge computing based on
+  meta reinforcement learning." IEEE Transactions on Parallel and Distributed Systems
+  32, no. 1 (2020): 242-253.
 
-Contrary to the above research, this workload generator dynamically creates task graphs whose
-structure follow the patterns used in the papers above. The workload generator furthermore allows for
-customization to suit various users' needs.
+Contrary to the above research, this workload generator dynamically creates task
+graphs whose structure follow the patterns used in the papers above. The workload
+generator furthermore allows for customization to suit various users' needs.
 
-The workload generation is based on the daggen random graph generator suggested by Suter & Hunold
-with modifications from the following paper:
+The workload generation is based on the daggen random graph generator
+suggested by Suter & Hunold with modifications from the following paper:
 
 - H. Arabnejad and J. Barbosa. "List Scheduling Algorithm for Heterogeneous Systems by
   an Optimistic Cost Table." IEEE Transactions on Parallel and Distributed Systems,
@@ -36,9 +39,10 @@ The `BinaryEnv` environment mimics a simple computing infrastructure:
        |             | <---------------- |            |
        +-------------+      Download     +------------+
 
-This infrastructure includes a user device connected to an edge server. Tasks can be offloaded
-from the device to the server. These resources are interlinked by a network connection with
-distinct capacities for upload (device to edge server) and download (edge server to device).
+This infrastructure includes a user device connected to an edge server.
+Tasks can be offloaded from the device to the server. These resources are interlinked
+by a network connection with distinct capacities for upload (device to edge server)
+and download (edge server to device).
 """
 
 from typing import Union, Optional, Tuple, List, Any, Callable, Dict
@@ -81,8 +85,8 @@ DEFAULT_CLUSTER_CONFIG = {
     "edge_cpu_capacity": 4 * 10**9,
     "num_local_cpus": 1,
     "local_cpu_capacity": 10**9,
-    "upload_rate": 1,
-    "download_rate": 1,
+    "upload_rate": 11,
+    "download_rate": 11,
     "power_tx": 1.258,
     "power_rx": 1.181,
     "power_cpu": 1.25,
@@ -98,8 +102,8 @@ DEFAULT_WORKLOAD_CONFIG = {
     "density_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
     "regularity_values": [0.2, 0.5, 0.8],
     "fat_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
-    "ccr_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
-    "jump_values": [1, 2, 4],
+    "ccr_values": [0.3, 0.4, 0.5],
+    "jump_values": [1, 2],
 }
 
 
@@ -193,6 +197,7 @@ class BinaryOffloadEnv(BaseOffEnv):
                 self.tasks_per_app,
                 TASK_PROFILE_LENGTH + TASK_SUCCESSORS + TASK_PREDECESSORS,
             ),
+            dtype=np.float32
         )
 
     def reset(
@@ -269,7 +274,8 @@ class BinaryOffloadEnv(BaseOffEnv):
 
         return (
             self._get_ob(),
-            np.sum(rewards, axis=0),
+            # np.sum(rewards, axis=0),
+            np.mean(rewards),
             False,
             truncate,
             {
@@ -349,7 +355,7 @@ class BinaryOffloadEnv(BaseOffEnv):
         task_encoder: Callable[[TaskAttr], List[float]],
         normalize_ids: bool = True
     ) -> np.ndarray:
-        """Creates a list of task embeddings as per the MRLCO paper."""
+        """Creates a list of task embeddings as per the MRLCO/DRLTO papers."""
         task_info = []
         for task_id, task_attr in sorted_tasks:
             task_predecessors = list(task_graph.pred[task_id].keys())

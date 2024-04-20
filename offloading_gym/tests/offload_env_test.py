@@ -2,6 +2,8 @@ import unittest
 import gymnasium as gym
 import numpy as np
 
+from offloading_gym.envs import BinaryOffloadWrapper
+
 
 TEST_CLUSTER_CONFIG = {
     "num_edge_cpus": 4,
@@ -112,3 +114,17 @@ class TestOffloadingEnv(unittest.TestCase):
         for i in range(5):
             obs_list, _ = envs.reset(seed=5)
             self.assertEqual(len(obs_list), num_envs)
+
+    def test_wrapper(self):
+        num_tasks = 30
+        env = gym.make(
+            "BinaryOffload-v0",
+            **{"tasks_per_app": num_tasks, "max_episode_steps": 1},
+        )
+        wrapped_env = BinaryOffloadWrapper(gym_env=env)
+        self.assertEqual(wrapped_env.action_spec().shape, (30, ))
+        self.assertEqual(wrapped_env.observation_spec().shape, (30, 17))
+        self.assertEqual(wrapped_env.observation_spec().minimum, -1.0)
+        wrapped_env.reset()
+        ts = wrapped_env.step(action=env.action_space.sample())
+        self.assertTrue(isinstance(ts.reward, np.ndarray))

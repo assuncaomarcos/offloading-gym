@@ -9,3 +9,7 @@ matplotlib>=3.8.3
 jax>=0.4.25
 simpy~=4.1.1
 click~=8.1.7
+tf-agents[reverb]~=0.19.0
+tensorflow~=2.15.0
+absl-py~=2.1.0
+gin-config~=0.5.0
