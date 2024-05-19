@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import tensorflow as tf
 
-from offloading_gym.models import tpto
+from offloading_gym.networks import tpto
 
 
 class TestEncoder(unittest.TestCase):

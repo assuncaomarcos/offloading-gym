@@ -9,7 +9,7 @@ import numpy as np
 
 from collections import namedtuple
 from typing import List
-from offloading_gym.models import tpto
+from offloading_gym.networks import tpto
 
 NUMBER_EPOCHS = 10
 PARALLEL_WORKERS = 5

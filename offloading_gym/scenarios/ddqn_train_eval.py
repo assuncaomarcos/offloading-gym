@@ -23,8 +23,10 @@ import gin
 import reverb
 import gymnasium as gym
 from offloading_gym.envs.wrappers import MultiBinaryToDiscreteWrapper, GymnasiumWrapper
+from offloading_gym.networks import dueling_q_network
 from tensorflow import keras
 from tf_agents.agents.dqn import dqn_agent
+# from offloading_gym.agents import dqn_agent
 from tf_agents.metrics import py_metrics
 from tf_agents.networks import sequential, q_network
 from tf_agents.policies import py_tf_eager_policy
@@ -130,6 +132,14 @@ def train_eval(
         ),
         dropout_layer_params=dropout_params
     )
+
+    # q_net = dueling_q_network.DuelingQNetwork(
+    #     observation_tensor_spec,
+    #     action_tensor_spec,
+    #     input_fc_layer_params=fc_layer_params,
+    #     output_fc_layer_params=fc_layer_params,
+    #     lstm_size=256
+    # )
 
     agent = dqn_agent.DqnAgent(
         time_step_tensor_spec,

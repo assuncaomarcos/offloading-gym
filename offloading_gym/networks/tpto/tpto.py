@@ -3,7 +3,7 @@
 
 import gymnasium as gym
 
-from offloading_gym.models.base import DRLModel
+from offloading_gym.networks.base import DRLModel
 
 
 class TransformerPPO(DRLModel):
