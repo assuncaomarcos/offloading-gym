@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-This module contains classes used to represent the computing infrastructure as per the MRLCO/DRLTO papers.
+This module contains classes used to represent the computing infrastructure as per the
+MRLCO/DRLTO papers.
 
        +-------------+      Upload       +------------+
        |             | ----------------> |            |
@@ -16,7 +17,7 @@ whose upload (device to edge server) and download (edge server to device) capaci
 are separately provided.
 """
 
-from ..task_graph import TaskAttr
+from offloading_gym.task_graph import TaskAttr
 
 BITS_IN_MEGABIT = 10**6
 

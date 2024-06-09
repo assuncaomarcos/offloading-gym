@@ -59,7 +59,7 @@ from offloading_gym.envs.workload import build_workload
 from offloading_gym.task_graph import TaskGraph, TaskAttr, TaskTuple
 from offloading_gym.utils import arrays
 from offloading_gym.workload import Workload
-from offloading_gym.simulation import Cluster, Simulator, TaskExecution
+from offloading_gym.simulation.offload import Cluster, Simulator, TaskExecution
 
 
 __all__ = ["BinaryOffloadEnv"]

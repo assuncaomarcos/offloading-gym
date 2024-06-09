@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import simpy
-from .cluster import Cluster
-from ..task_graph import TaskAttr, TaskTuple
+from offloading_gym.simulation.offload.cluster import Cluster
+from offloading_gym.task_graph import TaskAttr, TaskTuple
 from typing import List, Union
 from enum import IntEnum
 from dataclasses import dataclass

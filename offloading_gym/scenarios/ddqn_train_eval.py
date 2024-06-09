@@ -107,8 +107,8 @@ def train_eval(
                     **{
                         "tasks_per_app": tasks_per_app,
                         "max_episode_steps": max_episode_steps,
-                        "weight_latency" : weight_latency,
-                        "weight_energy" : weight_energy,
+                        "weight_latency": weight_latency,
+                        "weight_energy": weight_energy,
                         "normalize_task_ids": normalize_task_ids
                     },
                 )
@@ -183,7 +183,7 @@ def train_eval(
     )
 
     dataset = reverb_replay.as_dataset(
-        num_parallel_calls=3, sample_batch_size=batch_size, # num_steps=2
+        num_parallel_calls=3, sample_batch_size=batch_size,  # num_steps=2
     ).prefetch(3)
     experience_dataset_fn = lambda: dataset
 
