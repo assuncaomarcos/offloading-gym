@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+Module that provides resources for simulating task
+scheduling in a fog environment.
+"""
+
 from __future__ import annotations
 
-from simpy.resources.resource import Resource, Request
-from simpy.resources.base import Get
+from simpy.resources.resource import Resource, Request, Release
 from simpy.core import BoundClass, Environment, SimTime
 from simpy.exceptions import SimPyException
 from typing import TYPE_CHECKING, List
@@ -40,19 +44,6 @@ class ComputeRequest(Request):
         )
 
 
-class ComputeRelease(Get):
-    """Releases the usage of *resources* granted by *request*. This event is
-    triggered immediately. Subclass of :class:`simpy.resources.base.Get`.
-
-    """
-    request: ComputeRequest
-
-    def __init__(self, resource: ComputeResource, request: ComputeRequest):
-        self.request = request
-        """The request (:class:`Request`) that is to be released."""
-        super().__init__(resource)
-
-
 class ComputeResource(Resource):
     _cpu_core_speed: float
     """Capacity of each CPU core in GHz/second"""
@@ -81,6 +72,7 @@ class ComputeResource(Resource):
 
     @property
     def env(self):
+        """Return the environment associated with the resource"""
         return self._env
 
     @property
@@ -90,10 +82,12 @@ class ComputeResource(Resource):
 
     @property
     def cpu_core_speed(self) -> float:
+        """Return the CPU core speed in GHz/second"""
         return self._cpu_core_speed
 
     @property
     def memory_capacity(self) -> float:
+        """Return the memory capacity in GB"""
         return self._memory_capacity
 
     if TYPE_CHECKING:
@@ -102,13 +96,13 @@ class ComputeResource(Resource):
             """Request a usage slot."""
             return ComputeRequest(self, cpu_cores, memory)
 
-        def release(self, request: ComputeRequest) -> ComputeRelease:
+        def release(self, request: ComputeRequest) -> Release:
             """Release a usage slot."""
-            return ComputeRelease(self, request)
+            return Release(self, request)
 
     else:
         request = BoundClass(ComputeRequest)
-        release = BoundClass(ComputeRelease)
+        release = BoundClass(Release)
 
     def _do_put(self, event: ComputeRequest) -> None:
         if event.cpu_cores <= self._available_cpu_cores and event.memory <= self._available_memory:
@@ -120,20 +114,15 @@ class ComputeResource(Resource):
         elif event.cpu_cores > self.number_of_cores or event.memory > self._memory_capacity:
             event.fail(SimPyException("Request exceeded maximum capacity"))
 
-    def _do_get(self, event: ComputeRelease) -> None:
+    def _do_get(self, event: Release) -> None:
         try:
             self.users.remove(event.request)  # type: ignore
-            self._available_memory += event.request.memory
-            self._available_cpu_cores += event.request.cpu_cores
+            if isinstance(event.request, ComputeRequest):
+                self._available_memory += event.request.memory
+                self._available_cpu_cores += event.request.cpu_cores
         except ValueError:
             pass
         event.succeed()
-
-    def upload_time(self, req_bytes: int):
-        pass
-
-    def execution_time(self, req_cycles: int):
-        pass
 
     def __str__(self):
         return (

@@ -25,9 +25,13 @@ class TestSimulation(unittest.TestCase):
             self.env.process(self.execute_task(self.resource))
         self.env.run()
 
-    def test_not_ok_requests(self):
+    def test_not_ok_cpus(self):
         self.env.process(self.execute_task(self.resource, n_cores=CPU_CORES + 1))
-        self.env.run()
+        self.assertRaises(simpy.exceptions.SimPyException, self.env.run)
+
+    def test_not_ok_memory(self):
+        self.env.process(self.execute_task(self.resource, n_cores=CPU_CORES, memory=MEMORY + 0.1))
+        self.assertRaises(simpy.exceptions.SimPyException, self.env.run)
 
     def execute_task(self, resource: ComputeResource, n_cores: int = 1, memory: float = 0.1):
         with resource.request(cpu_cores=n_cores, memory=memory) as req:
