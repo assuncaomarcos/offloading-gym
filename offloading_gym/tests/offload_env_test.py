@@ -2,7 +2,7 @@ import unittest
 import gymnasium as gym
 import numpy as np
 
-from offloading_gym.envs import BinaryOffloadWrapper
+from offloading_gym.envs.wrappers import GymnasiumWrapper
 
 
 TEST_CLUSTER_CONFIG = {
@@ -121,7 +121,7 @@ class TestOffloadingEnv(unittest.TestCase):
             "BinaryOffload-v0",
             **{"tasks_per_app": num_tasks, "max_episode_steps": 1},
         )
-        wrapped_env = BinaryOffloadWrapper(gym_env=env)
+        wrapped_env = GymnasiumWrapper(gym_env=env)
         self.assertEqual(wrapped_env.action_spec().shape, (30, ))
         self.assertEqual(wrapped_env.observation_spec().shape, (30, 17))
         self.assertEqual(wrapped_env.observation_spec().minimum, -1.0)
