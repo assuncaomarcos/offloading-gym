@@ -21,19 +21,24 @@ class TestSimulation(unittest.TestCase):
         )
 
     def test_ok_requests(self):
+        """Tests a few requests that respect the maximum resource capacity."""
         for _ in range(CPU_CORES * 2):
             self.env.process(self.execute_task(self.resource))
         self.env.run()
 
     def test_not_ok_cpus(self):
+        """Tests a few requests that exceed the maximum number of CPU cores."""
         self.env.process(self.execute_task(self.resource, n_cores=CPU_CORES + 1))
         self.assertRaises(simpy.exceptions.SimPyException, self.env.run)
 
     def test_not_ok_memory(self):
+        """Tests a few requests that exceed the maximum amount of memory."""
         self.env.process(self.execute_task(self.resource, n_cores=CPU_CORES, memory=MEMORY + 0.1))
         self.assertRaises(simpy.exceptions.SimPyException, self.env.run)
 
-    def execute_task(self, resource: ComputeResource, n_cores: int = 1, memory: float = 0.1):
+    @staticmethod
+    def execute_task(resource: ComputeResource, n_cores: int = 1, memory: float = 0.1):
+        """Simulates task execution using simpy"""
         with resource.request(cpu_cores=n_cores, memory=memory) as req:
             yield req
             start_time = resource.env.now

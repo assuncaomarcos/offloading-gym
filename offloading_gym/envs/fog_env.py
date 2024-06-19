@@ -30,7 +30,7 @@ import numpy as np
 GRID_COORDINATES = (0, )
 
 
-class FogOffloadEnv(BaseOffEnv):
+class FogPlacementEnv(BaseOffEnv):
     action_space: gym.spaces.Discrete
     observation_space: gym.spaces.Dict
 
