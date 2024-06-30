@@ -11,8 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List, Dict, Union, Optional
 
 import math
-import numpy as np
 import itertools
+import numpy as np
 import simpy
 
 from simpy.resources.resource import Resource, Request, Release
@@ -46,6 +46,7 @@ DEFAULT_COMP_CONFIG = ComputingConfig(
         resource_config=ResourceConfig(
             cpu_cores=[1], cpu_core_speed=[1.0], memory=[1.0]
         ),
+        network_config=None,
         deployment_area=MONTREAL_AREA,
     ),
     edge=ResourceGroupConfig(
@@ -240,11 +241,13 @@ class GeolocationResource(ComputeResource):
         return radius * latitude, radius * math.cos(latitude) * longitude
 
     def manhattan_distance(self, resource: GeolocationResource) -> float:
+        """Computes the Manhattan distance between GeolocationResources."""
         lat1, lon1 = self._to_km(self.latitude, self.longitude)
         lat2, lon2 = self._to_km(resource.latitude, resource.longitude)
         return abs(lat1 - lat2) + abs(lon1 - lon2)
 
     def euclidean_distance(self, resource: GeolocationResource) -> float:
+        """Computes the Euclidean distance between GeolocationResources."""
         lat1, lon1 = self._to_km(self.latitude, self.longitude)
         lat2, lon2 = self._to_km(resource.latitude, resource.longitude)
         return math.sqrt((lat1 - lat2) ** 2 + (lon1 - lon2) ** 2)
@@ -273,15 +276,19 @@ class ComputingEnvironment:
         self._cloud_resources = cloud_resources
         self._all_resources = {}
 
-        for resource_list in [iot_devices, edge_resources, cloud_resources]:
+        for resource_list in [edge_resources, cloud_resources]:
             for resource in resource_list:
                 self._all_resources[resource.resource_id] = resource
 
+    @property
+    def simpy_env(self) -> simpy.Environment:
+        return self._simpy_env
+
     @staticmethod
     def build(
-        simpy_env: simpy.Environment,
         *,
-        seed: Optional[int] = None,
+        simpy_env: simpy.Environment,
+        seed: Optional[Union[int, np.random.Generator]] = None,
         config: Optional[ComputingConfig] = DEFAULT_COMP_CONFIG,
     ) -> ComputingEnvironment:
 
@@ -289,8 +296,10 @@ class ComputingEnvironment:
         if ComputingEnvironment.np_random is None:
             if seed is not None:
                 ComputingEnvironment.np_random, _ = seeding.np_random(seed)
-            else:
+            elif isinstance(seed, int):
                 ComputingEnvironment.np_random, _ = seeding.np_random()
+            else:
+                ComputingEnvironment.np_random = seed
 
         rand = ComputingEnvironment.np_random
         resource_ids = itertools.count(start=0)
@@ -396,5 +405,6 @@ class ComputingEnvironment:
             for coord in coordinates
         ]
 
-    def resources(self) -> Dict[int, GeolocationResource]:
-        return self._all_resources
+    @property
+    def resources(self) -> List[GeolocationResource]:
+        return list(self._all_resources.values())

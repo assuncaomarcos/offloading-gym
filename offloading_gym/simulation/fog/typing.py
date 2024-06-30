@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""Module containing typing classes for the fog simulation."""
+
 from __future__ import annotations
 
 from typing import List, NamedTuple, Union
@@ -82,6 +84,9 @@ class NetworkConfig(NamedTuple):
     bandwidth: Interval
 
 
+GeographicalArea = Union[RectGeographicalArea, List[Coordinate]]
+
+
 class ResourceGroupConfig(NamedTuple):
     """
     Data type for the configuration of a group of
@@ -91,7 +96,7 @@ class ResourceGroupConfig(NamedTuple):
     num_resources: int
     resource_config: ResourceConfig
     network_config: Union[NetworkConfig, None]
-    deployment_area: Union[RectGeographicalArea, List[Coordinate]]
+    deployment_area: GeographicalArea
 
 
 class ComputingConfig(NamedTuple):
