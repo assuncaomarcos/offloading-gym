@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import List, NamedTuple, Union
+from typing import List, NamedTuple, Union, AnyStr
 
 
 class Coordinate(NamedTuple):
@@ -105,3 +105,10 @@ class ComputingConfig(NamedTuple):
     iot: ResourceGroupConfig
     edge: ResourceGroupConfig
     cloud: ResourceGroupConfig
+
+
+class CloudSite(NamedTuple):
+    title: AnyStr
+    country: AnyStr
+    location: Coordinate
+    latency: Interval
