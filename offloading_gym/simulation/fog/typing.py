@@ -96,7 +96,7 @@ class ResourceGroupConfig(NamedTuple):
     num_resources: int
     resource_config: ResourceConfig
     network_config: Union[NetworkConfig, None]
-    deployment_area: GeographicalArea
+    deployment_area: Union[GeographicalArea, List[CloudSite]]
 
 
 class ComputingConfig(NamedTuple):
@@ -107,8 +107,7 @@ class ComputingConfig(NamedTuple):
     cloud: ResourceGroupConfig
 
 
-class CloudSite(NamedTuple):
+class CloudSite(Coordinate):
     title: AnyStr
     country: AnyStr
-    location: Coordinate
     latency: Interval

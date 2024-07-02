@@ -6,6 +6,9 @@ Module for downloading and loading the WonderProxy dataset to
 derive minimum and maximum latencies between a source city and
 multiple servers in selected target countries.
 
+More details on the dataset can be found
+`here <https://wonderproxy.com/blog/a-day-in-the-life-of-the-internet/>`_.
+
 Usage example:
     To download the dataset to ./data directory, and compute the latencies
     from Montreal (id 52) to all locations in Canada and the United States:

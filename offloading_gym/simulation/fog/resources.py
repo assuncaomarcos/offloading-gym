@@ -20,6 +20,7 @@ from simpy.core import BoundClass, Environment, SimTime
 from simpy.exceptions import SimPyException
 from gymnasium.utils import seeding
 
+from .backbone import server_info as cloud_sites
 from .typing import (
     Coordinate,
     RectGeographicalArea,
@@ -28,6 +29,7 @@ from .typing import (
     ResourceGroupConfig,
     ComputingConfig,
     NetworkConfig,
+    CloudSite
 )
 
 
@@ -260,15 +262,12 @@ class ComputingEnvironment:
     _all_resources: Dict[int, GeolocationResource]
     _simpy_env: simpy.Environment
 
-    # The random number generator is a class variable
-    np_random: Union[np.random.Generator, None] = None
-
     def __init__(
         self,
         simpy_env: simpy.Environment,
         iot_devices: List[GeolocationResource],
         edge_resources: List[GeolocationResource],
-        cloud_resources: List[GeolocationResource],
+        cloud_resources: List[GeolocationResource]
     ):
         self._simpy_env = simpy_env
         self._iot_devices = iot_devices
@@ -288,20 +287,13 @@ class ComputingEnvironment:
     def build(
         *,
         simpy_env: simpy.Environment,
-        seed: Optional[Union[int, np.random.Generator]] = None,
+        seed: Optional[int] = None,
         config: Optional[ComputingConfig] = DEFAULT_COMP_CONFIG,
     ) -> ComputingEnvironment:
 
-        # Initialize the RNG only the first time the method is called
-        if ComputingEnvironment.np_random is None:
-            if seed is not None:
-                ComputingEnvironment.np_random, _ = seeding.np_random(seed)
-            elif isinstance(seed, int):
-                ComputingEnvironment.np_random, _ = seeding.np_random()
-            else:
-                ComputingEnvironment.np_random = seed
+        # Initialize the RNG
+        rand, seed = seeding.np_random(seed)
 
-        rand = ComputingEnvironment.np_random
         resource_ids = itertools.count(start=0)
         iot_config = config.iot
 
