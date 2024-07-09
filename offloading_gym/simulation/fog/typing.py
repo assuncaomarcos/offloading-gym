@@ -6,52 +6,32 @@
 from __future__ import annotations
 
 from typing import List, NamedTuple, Union, AnyStr
+from dataclasses import dataclass
+from enum import Enum
 
 
-class Coordinate(NamedTuple):
-    """Namedtuple that represents a geographical coordinate."""
+@dataclass(frozen=True)
+class Coordinate:
+    """Represents a geographical coordinate."""
 
     lat: float
     long: float
 
 
+@dataclass(frozen=True)
 class RectGeographicalArea:
     """
-    Set of geographical coordinates that form a rectangular area on which
-    edge resources are deployed.
+    Set of geographical coordinates that form a rectangular area
+    on which edge resources are deployed.
     """
+    northeast: Coordinate
+    northwest: Coordinate
+    southeast: Coordinate
+    southwest: Coordinate
 
-    def __init__(
-        self,
-        *,
-        northeast: Coordinate,
-        northwest: Coordinate,
-        southeast: Coordinate,
-        southwest: Coordinate,
-    ):
-        self._northeast = northeast
-        self._northwest = northwest
-        self._southeast = southeast
-        self._southwest = southwest
-
+    def __post_init__(self):
         if not self._is_rectangle():
-            raise ValueError("Coordinates do not form a rectangle")
-
-    @property
-    def northeast(self):
-        return self._northeast
-
-    @property
-    def northwest(self):
-        return self._northwest
-
-    @property
-    def southeast(self):
-        return self._southeast
-
-    @property
-    def southwest(self):
-        return self._southwest
+            raise ValueError('Set of coordinates is not a rectangular area.')
 
     def _is_rectangle(self):
         # Check to see if the coordinates form a rectangle
@@ -61,6 +41,15 @@ class RectGeographicalArea:
             and self.northeast.long == self.southeast.long
             and self.northwest.long == self.southwest.long
         )
+
+class ResourceType(Enum):
+    IOT = "iot"
+    EDGE = "edge"
+    CLOUD = "cloud"
+
+    # Python < 3.11 does not have StrEnum
+    def __str__(self):
+        return self.value
 
 
 class ResourceConfig(NamedTuple):
@@ -87,7 +76,8 @@ class NetworkConfig(NamedTuple):
 GeographicalArea = Union[RectGeographicalArea, List[Coordinate]]
 
 
-class ResourceGroupConfig(NamedTuple):
+@dataclass(frozen=True)
+class ResourceGroupConfig:
     """
     Data type for the configuration of a group of
     resources (e.g., IoT devices, edge servers, cloud servers)
@@ -99,7 +89,8 @@ class ResourceGroupConfig(NamedTuple):
     deployment_area: Union[GeographicalArea, List[CloudSite]]
 
 
-class ComputingConfig(NamedTuple):
+@dataclass(frozen=True)
+class ComputingConfig:
     """Data type for the configuration data of a fog environment."""
 
     iot: ResourceGroupConfig
@@ -107,6 +98,7 @@ class ComputingConfig(NamedTuple):
     cloud: ResourceGroupConfig
 
 
+@dataclass(frozen=True)
 class CloudSite(Coordinate):
     title: AnyStr
     country: AnyStr

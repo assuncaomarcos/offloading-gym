@@ -28,9 +28,9 @@ def _load_latency_info() -> List[CloudSite]:
     sites = []
     for _, row in df.iterrows():
         site = CloudSite(
+            lat=row["latitude"], long=row["longitude"],
             title=row["title"],
             country=row["country"],
-            location=Coordinate(lat=row["latitude"], long=row["longitude"]),
             latency=Interval(min=row["min_latency"], max=row["max_latency"]),
         )
         sites.append(site)

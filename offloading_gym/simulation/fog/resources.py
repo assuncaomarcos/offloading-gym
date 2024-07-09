@@ -8,7 +8,8 @@ scheduling in a fog environment.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Dict, Union, Optional
+from typing import TYPE_CHECKING, List, Dict, Callable, Optional
+from dataclasses import dataclass
 
 import math
 import itertools
@@ -20,16 +21,18 @@ from simpy.core import BoundClass, Environment, SimTime
 from simpy.exceptions import SimPyException
 from gymnasium.utils import seeding
 
-from .backbone import server_info as cloud_sites
+from offloading_gym.simulation.fog import backbone
 from .typing import (
     Coordinate,
     RectGeographicalArea,
+    GeographicalArea,
     Interval,
+    ResourceType,
     ResourceConfig,
     ResourceGroupConfig,
     ComputingConfig,
     NetworkConfig,
-    CloudSite
+    CloudSite,
 )
 
 
@@ -65,7 +68,7 @@ DEFAULT_COMP_CONFIG = ComputingConfig(
             cpu_cores=[8], cpu_core_speed=[2.0, 2.6, 3.0], memory=[16.0, 24.0, 32.0]
         ),
         network_config=NetworkConfig(bandwidth=Interval(min=4, max=8)),
-        deployment_area=MONTREAL_AREA,
+        deployment_area=backbone.server_info(),
     ),
 )
 
@@ -215,9 +218,18 @@ class GeolocationResource(ComputeResource):
     resource_id: int
     latitude: float
     longitude: float
+    resource_type: ResourceType
 
-    def __init__(self, resource_id: int, latitude: float, longitude: float, **kwargs):
+    def __init__(
+        self,
+        resource_id: int,
+        res_type: ResourceType,
+        latitude: float,
+        longitude: float,
+        **kwargs,
+    ):
         self.resource_id = resource_id
+        self.resource_type = res_type
         self.latitude = latitude
         self.longitude = longitude
         super().__init__(**kwargs)
@@ -225,6 +237,7 @@ class GeolocationResource(ComputeResource):
     def __str__(self):
         return (
             f"GeolocationResource<resource_id={self.resource_id}, "
+            f"resource_type={self.resource_type}, "
             f"latitude={self.latitude}, "
             f"longitude={self.longitude}>, "
             f"n_cpu_cores={self.capacity}, "
@@ -255,89 +268,32 @@ class GeolocationResource(ComputeResource):
         return math.sqrt((lat1 - lat2) ** 2 + (lon1 - lon2) ** 2)
 
 
-class ComputingEnvironment:
-    _iot_devices: List[GeolocationResource]
-    _edge_resources: List[GeolocationResource]
-    _cloud_resources: List[GeolocationResource]
-    _all_resources: Dict[int, GeolocationResource]
+class ResourceManager:
     _simpy_env: simpy.Environment
+    _np_random: np.random.Generator
+    _config: ComputingConfig
+    _coord_fn: Dict[ResourceType, Callable[[GeographicalArea, int], List[Coordinate]]]
+    _resource_ids: itertools.count
 
     def __init__(
         self,
         simpy_env: simpy.Environment,
-        iot_devices: List[GeolocationResource],
-        edge_resources: List[GeolocationResource],
-        cloud_resources: List[GeolocationResource]
+        np_random: np.random.Generator,
+        config: ComputingConfig,
     ):
         self._simpy_env = simpy_env
-        self._iot_devices = iot_devices
-        self._edge_resources = edge_resources
-        self._cloud_resources = cloud_resources
-        self._all_resources = {}
-
-        for resource_list in [edge_resources, cloud_resources]:
-            for resource in resource_list:
-                self._all_resources[resource.resource_id] = resource
-
-    @property
-    def simpy_env(self) -> simpy.Environment:
-        return self._simpy_env
-
-    @staticmethod
-    def build(
-        *,
-        simpy_env: simpy.Environment,
-        seed: Optional[int] = None,
-        config: Optional[ComputingConfig] = DEFAULT_COMP_CONFIG,
-    ) -> ComputingEnvironment:
-
-        # Initialize the RNG
-        rand, seed = seeding.np_random(seed)
-
-        resource_ids = itertools.count(start=0)
-        iot_config = config.iot
-
-        # Create the IoT device(s)
-        coordinates = ComputingEnvironment.random_coordinates(
-            np_random=rand,
-            num_locations=iot_config.num_resources,
-            area=iot_config.deployment_area,
-        )
-
-        iot_resources = ComputingEnvironment.create_resources(
-            iot_config, coordinates, resource_ids, rand, simpy_env
-        )
-
-        # Create edge resources
-        edge_config = config.edge
-        coordinates = ComputingEnvironment.grid_coordinates(
-            num_locations=edge_config.num_resources, area=edge_config.deployment_area
-        )
-
-        edge_resources = ComputingEnvironment.create_resources(
-            edge_config, coordinates, resource_ids, rand, simpy_env
-        )
-
-        # Create cloud resources
-        cloud_config = config.cloud
-        coordinates = ComputingEnvironment.dummy_coordinates(
-            num_locations=cloud_config.num_resources, area=cloud_config.deployment_area
-        )
-
-        cloud_resources = ComputingEnvironment.create_resources(
-            cloud_config, coordinates, resource_ids, rand, simpy_env
-        )
-
-        return ComputingEnvironment(
-            simpy_env=simpy_env,
-            iot_devices=iot_resources,
-            edge_resources=edge_resources,
-            cloud_resources=cloud_resources,
-        )
+        self._np_random = np_random
+        self._config = config
+        self._coord_fn = {
+            ResourceType.EDGE: self.grid_coordinates,
+            ResourceType.CLOUD: self.cloud_coordinates,
+            ResourceType.IOT: self.random_coordinates,
+        }
+        self._resource_ids = itertools.count(start=0)
 
     @staticmethod
     def grid_coordinates(
-        num_locations: int, area: RectGeographicalArea
+        area: RectGeographicalArea, num_locations: int
     ) -> List[Coordinate]:
         locations_per_side = round(np.sqrt(num_locations))
         lat_values = np.linspace(
@@ -352,14 +308,13 @@ class ComputingEnvironment:
 
         return locations[:num_locations]
 
-    @staticmethod
     def random_coordinates(
-        np_random: np.random.Generator, num_locations: int, area: RectGeographicalArea
+        self, area: RectGeographicalArea, num_locations: int
     ) -> List[Coordinate]:
-        lat_values = np_random.uniform(
+        lat_values = self._np_random.uniform(
             area.northwest.lat, area.southeast.lat, size=num_locations
         )
-        long_values = np_random.uniform(
+        long_values = self._np_random.uniform(
             area.northwest.long, area.southeast.long, size=num_locations
         )
         locations = [
@@ -367,36 +322,67 @@ class ComputingEnvironment:
         ]
         return locations
 
-    @staticmethod
-    def dummy_coordinates(
-        num_locations: int, area: RectGeographicalArea
-    ) -> List[Coordinate]:
-        return [
-            Coordinate(lat=area.southeast.lat, long=area.southeast.long)
-            for _ in range(num_locations)
-        ]
+    def cloud_coordinates(
+        self, sites: List[CloudSite], num_locations: int
+    ) -> List[CloudSite]:
+        indices = self._np_random.choice(len(sites), num_locations)
+        return [sites[i] for i in indices]
 
-    @staticmethod
-    def create_resources(
-        config: ResourceGroupConfig,
-        coordinates: List[Coordinate],
-        resource_ids: itertools.count,
-        rand: np.random,
-        simpy_env: Environment,
-    ):
+    def create_resources(self) -> List[GeolocationResource]:
+        resources = []
+        for res_type in [ResourceType.IOT, ResourceType.EDGE, ResourceType.CLOUD]:
+            resources += self.create_resource_group(res_type)
+        return resources
+
+    def create_resource_group(self, resource_type: ResourceType):
+        config: ResourceGroupConfig = getattr(self._config, f"{resource_type}")
+        get_coordinates = self._coord_fn[resource_type]
+        coordinates = get_coordinates(config.deployment_area, config.num_resources)
+        res_config = config.resource_config
         return [
             GeolocationResource(
-                resource_id=next(resource_ids),
+                resource_id=next(self._resource_ids),
+                res_type=resource_type,
                 latitude=coord.lat,
                 longitude=coord.long,
-                env=simpy_env,
-                n_cpu_cores=rand.choice(config.resource_config.cpu_cores),
-                cpu_core_speed=rand.choice(config.resource_config.cpu_core_speed),
-                memory_capacity=rand.choice(config.resource_config.memory),
+                env=self._simpy_env,
+                n_cpu_cores=self._np_random.choice(res_config.cpu_cores),
+                cpu_core_speed=self._np_random.choice(res_config.cpu_core_speed),
+                memory_capacity=self._np_random.choice(res_config.memory),
             )
             for coord in coordinates
         ]
 
-    @property
-    def resources(self) -> List[GeolocationResource]:
-        return list(self._all_resources.values())
+
+@dataclass(frozen=True)
+class ComputingEnvironment:
+    simpy_env: simpy.Environment
+    resources: Dict[int, GeolocationResource]
+
+    @staticmethod
+    def build(
+        *,
+        simpy_env: simpy.Environment,
+        seed: Optional[int] = None,
+        config: Optional[ComputingConfig] = DEFAULT_COMP_CONFIG,
+    ) -> ComputingEnvironment:
+        """
+        Builds a computing environment for discrete event simulations.
+
+        Args:
+            simpy_env: the simpy environment to use
+            seed: the RNG seed for reproducibility
+            config: the environment configuration
+
+        Returns:
+            A computing environment
+        """
+
+        # Initialize the RNG
+        rand, seed = seeding.np_random(seed)
+        res_mgmt = ResourceManager(simpy_env=simpy_env, np_random=rand, config=config)
+
+        resources = res_mgmt.create_resources()
+        resource_dict = {resource.resource_id: resource for resource in resources}
+
+        return ComputingEnvironment(simpy_env=simpy_env, resources=resource_dict)
