@@ -21,8 +21,7 @@ from simpy.core import BoundClass, Environment, SimTime
 from simpy.exceptions import SimPyException
 from gymnasium.utils import seeding
 
-from offloading_gym.simulation.fog import backbone
-from .typing import (
+from .config import (
     Coordinate,
     RectGeographicalArea,
     GeographicalArea,
@@ -33,43 +32,7 @@ from .typing import (
     ComputingConfig,
     NetworkConfig,
     CloudSite,
-)
-
-
-# The following GPS coordinates roughly encompass the entire
-# city of Montreal, forming a rough rectangular boundary around it.
-MONTREAL_AREA = RectGeographicalArea(
-    northeast=Coordinate(lat=45.7057, long=73.4746),
-    northwest=Coordinate(lat=45.7057, long=73.9434),
-    southeast=Coordinate(lat=45.3831, long=73.4746),
-    southwest=Coordinate(lat=45.3831, long=73.9434),
-)
-
-DEFAULT_COMP_CONFIG = ComputingConfig(
-    iot=ResourceGroupConfig(
-        num_resources=1,
-        resource_config=ResourceConfig(
-            cpu_cores=[1], cpu_core_speed=[1.0], memory=[1.0]
-        ),
-        network_config=None,
-        deployment_area=MONTREAL_AREA,
-    ),
-    edge=ResourceGroupConfig(
-        num_resources=36,
-        resource_config=ResourceConfig(
-            cpu_cores=[4], cpu_core_speed=[1.5, 1.8, 2.0], memory=[1.0, 2.0, 4.0]
-        ),
-        network_config=NetworkConfig(bandwidth=Interval(min=10, max=12)),
-        deployment_area=MONTREAL_AREA,
-    ),
-    cloud=ResourceGroupConfig(
-        num_resources=20,
-        resource_config=ResourceConfig(
-            cpu_cores=[8], cpu_core_speed=[2.0, 2.6, 3.0], memory=[16.0, 24.0, 32.0]
-        ),
-        network_config=NetworkConfig(bandwidth=Interval(min=4, max=8)),
-        deployment_area=backbone.server_info(),
-    ),
+    DEFAULT_COMP_CONFIG
 )
 
 
@@ -215,6 +178,9 @@ class ComputeResource(Resource):
 
 
 class GeolocationResource(ComputeResource):
+    """
+    It represents a computing resource with geolocation information.
+    """
     resource_id: int
     latitude: float
     longitude: float
@@ -269,6 +235,10 @@ class GeolocationResource(ComputeResource):
 
 
 class ResourceManager:
+    """
+    Creates the required resources for a discrete event
+    simulation based on the environment configuration.
+    """
     _simpy_env: simpy.Environment
     _np_random: np.random.Generator
     _config: ComputingConfig
@@ -295,6 +265,18 @@ class ResourceManager:
     def grid_coordinates(
         area: RectGeographicalArea, num_locations: int
     ) -> List[Coordinate]:
+        """
+        Creates a grid in the provided rectangular geographical area
+        and computes the geolocation of resources considering one
+        resource per area in the grid.
+
+        Args:
+            area: a rectangular geographical area.
+            num_locations: the number of locations in the grid.
+
+        Returns:
+            A list of coordinates.
+        """
         locations_per_side = round(np.sqrt(num_locations))
         lat_values = np.linspace(
             area.northwest.lat, area.southeast.lat, num=locations_per_side
@@ -311,8 +293,19 @@ class ResourceManager:
     def random_coordinates(
         self, area: RectGeographicalArea, num_locations: int
     ) -> List[Coordinate]:
+        """
+        Randomly selects geolocations that fall into the provided
+        rectangular geographical area.
+
+        Args:
+            area: a rectangular geographical area.
+            num_locations: the number of locations.
+
+        Returns:
+            A list of coordinates.
+        """
         lat_values = self._np_random.uniform(
-            area.northwest.lat, area.southeast.lat, size=num_locations
+           area.southeast.lat,  area.northwest.lat, size=num_locations
         )
         long_values = self._np_random.uniform(
             area.northwest.long, area.southeast.long, size=num_locations
@@ -325,16 +318,37 @@ class ResourceManager:
     def cloud_coordinates(
         self, sites: List[CloudSite], num_locations: int
     ) -> List[CloudSite]:
+        """
+        Randomly selects geolocations from the list of servers
+        provided by the Wonderproxy dataset.
+
+        Args:
+            sites: the list of servers.
+            num_locations: the required number of locations.
+
+        Returns:
+            A list of cloud sites.
+        """
         indices = self._np_random.choice(len(sites), num_locations)
         return [sites[i] for i in indices]
 
     def create_resources(self) -> List[GeolocationResource]:
+        """Creates the required resources for a discrete event simulation."""
         resources = []
         for res_type in [ResourceType.IOT, ResourceType.EDGE, ResourceType.CLOUD]:
             resources += self.create_resource_group(res_type)
         return resources
 
     def create_resource_group(self, resource_type: ResourceType):
+        """
+        Creates the required resources of a given type.
+
+        Args:
+            resource_type: the type of resource to create (cloud, edge, iot).
+
+        Returns:
+            The list of resources.
+        """
         config: ResourceGroupConfig = getattr(self._config, f"{resource_type}")
         get_coordinates = self._coord_fn[resource_type]
         coordinates = get_coordinates(config.deployment_area, config.num_resources)
@@ -356,6 +370,10 @@ class ResourceManager:
 
 @dataclass(frozen=True)
 class ComputingEnvironment:
+    """
+    This class represents the computing infrastructure to use
+    for a given discrete event simulation.
+    """
     simpy_env: simpy.Environment
     resources: Dict[int, GeolocationResource]
 

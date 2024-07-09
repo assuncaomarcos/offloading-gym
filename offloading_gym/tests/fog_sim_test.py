@@ -1,6 +1,6 @@
 import unittest
 import networkx as nx
-from ..simulation.fog import ComputeResource
+from ..simulation.fog import ComputeResource, ComputingEnvironment, config
 from ..task_graph import TaskAttr, EdgeAttr, TaskGraph
 import simpy
 
@@ -44,4 +44,12 @@ class TestSimulation(unittest.TestCase):
             start_time = resource.env.now
             yield resource.env.timeout(5.0)
             finish_time = resource.env.now
-            print(req, start_time, finish_time)
+
+    def test_create_infra(self):
+        fog_env = ComputingEnvironment.build(
+            simpy_env=self.env, seed=42, config=config.DEFAULT_COMP_CONFIG
+        )
+        self.assertEqual(len(fog_env.resources), 57)
+        iot_device = fog_env.resources[0]
+        self.assertEqual(iot_device.resource_id, 0)
+        self.assertEqual(iot_device.resource_type, config.ResourceType.IOT)
