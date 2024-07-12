@@ -8,11 +8,13 @@ scheduling in a fog environment.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Dict, Callable, Optional
+from typing import TYPE_CHECKING, List, Dict, Callable, Optional, Union, Tuple
 from dataclasses import dataclass
+from collections import defaultdict
 
 import math
 import itertools
+import copy
 import numpy as np
 import simpy
 
@@ -25,12 +27,9 @@ from .config import (
     Coordinate,
     RectGeographicalArea,
     GeographicalArea,
-    Interval,
     ResourceType,
-    ResourceConfig,
     ResourceGroupConfig,
     ComputingConfig,
-    NetworkConfig,
     CloudSite,
     DEFAULT_COMP_CONFIG
 )
@@ -181,31 +180,29 @@ class GeolocationResource(ComputeResource):
     """
     It represents a computing resource with geolocation information.
     """
+
     resource_id: int
-    latitude: float
-    longitude: float
+    location: Union[Coordinate, CloudSite]
     resource_type: ResourceType
 
     def __init__(
         self,
         resource_id: int,
         res_type: ResourceType,
-        latitude: float,
-        longitude: float,
+        location: Coordinate,
         **kwargs,
     ):
         self.resource_id = resource_id
         self.resource_type = res_type
-        self.latitude = latitude
-        self.longitude = longitude
+        self.location = location
         super().__init__(**kwargs)
 
     def __str__(self):
         return (
             f"GeolocationResource<resource_id={self.resource_id}, "
             f"resource_type={self.resource_type}, "
-            f"latitude={self.latitude}, "
-            f"longitude={self.longitude}>, "
+            f"latitude={self.location.lat}, "
+            f"longitude={self.location.long}>, "
             f"n_cpu_cores={self.capacity}, "
             f"cpu_core_speed={self.cpu_core_speed}, "
             f"available_cpu_cores={self.available_cpu_cores}, "
@@ -223,15 +220,27 @@ class GeolocationResource(ComputeResource):
 
     def manhattan_distance(self, resource: GeolocationResource) -> float:
         """Computes the Manhattan distance between GeolocationResources."""
-        lat1, lon1 = self._to_km(self.latitude, self.longitude)
-        lat2, lon2 = self._to_km(resource.latitude, resource.longitude)
+        lat1, lon1 = self._to_km(self.location.lat, self.location.long)
+        lat2, lon2 = self._to_km(resource.location.lat, resource.location.long)
         return abs(lat1 - lat2) + abs(lon1 - lon2)
 
     def euclidean_distance(self, resource: GeolocationResource) -> float:
         """Computes the Euclidean distance between GeolocationResources."""
-        lat1, lon1 = self._to_km(self.latitude, self.longitude)
-        lat2, lon2 = self._to_km(resource.latitude, resource.longitude)
+        lat1, lon1 = self._to_km(self.location.lat, self.location.long)
+        lat2, lon2 = self._to_km(resource.location.lat, resource.location.long)
         return math.sqrt((lat1 - lat2) ** 2 + (lon1 - lon2) ** 2)
+
+
+@dataclass(frozen=True)
+class NetworkResource:
+    """
+    This class represents a network link or a virtual
+    network connection between an IoT resource and an
+    edge or cloud server
+    """
+
+    bandwidth: float
+    latency: float
 
 
 class ResourceManager:
@@ -239,11 +248,18 @@ class ResourceManager:
     Creates the required resources for a discrete event
     simulation based on the environment configuration.
     """
+
     _simpy_env: simpy.Environment
     _np_random: np.random.Generator
     _config: ComputingConfig
+    # Each resource group (iot, edge, cloud) has a specific function for
+    # creating/returning the resource geolocations
     _coord_fn: Dict[ResourceType, Callable[[GeographicalArea, int], List[Coordinate]]]
     _resource_ids: itertools.count
+    _iot_devices: Union[List[GeolocationResource], None]
+    _edge_servers: Union[List[GeolocationResource], None]
+    _cloud_servers: Union[List[GeolocationResource], None]
+    _net_resources: Union[Dict[int, Dict[int, NetworkResource]], None]
 
     def __init__(
         self,
@@ -255,14 +271,118 @@ class ResourceManager:
         self._np_random = np_random
         self._config = config
         self._coord_fn = {
-            ResourceType.EDGE: self.grid_coordinates,
-            ResourceType.CLOUD: self.cloud_coordinates,
-            ResourceType.IOT: self.random_coordinates,
+            ResourceType.EDGE: self._grid_coordinates,
+            ResourceType.CLOUD: self._cloud_coordinates,
+            ResourceType.IOT: self._random_coordinates,
         }
         self._resource_ids = itertools.count(start=0)
+        self._iot_devices = None
+        self._edge_servers = None
+        self._cloud_servers = None
+        self._net_resources = None
+
+    def compute_resources(
+        self,
+    ) -> Tuple[
+        List[GeolocationResource], List[GeolocationResource], List[GeolocationResource]
+    ]:
+        """
+        Returns the compute resources required for the simulation.
+
+        Returns:
+            A tuple of three lists containing namely the IoT devices,
+            the edge servers and the cloud servers
+        """
+        if self._iot_devices is None:
+            self._create_compute_resources()
+        return self._iot_devices, self._edge_servers, self._cloud_servers
+
+    def _create_compute_resources(
+        self,
+    ) -> Tuple[
+        List[GeolocationResource], List[GeolocationResource], List[GeolocationResource]
+    ]:
+        self._iot_devices = self._create_resource_group(ResourceType.IOT)
+        self._edge_servers = self._create_resource_group(ResourceType.EDGE)
+        self._cloud_servers = self._create_resource_group(ResourceType.CLOUD)
+        return self._iot_devices, self._edge_servers, self._cloud_servers
+
+    def _create_resource_group(self, resource_type: ResourceType):
+        """
+        Creates the required resources of a given type.
+
+        Args:
+            resource_type: the type of resource to create (cloud, edge, iot).
+
+        Returns:
+            The list of resources.
+        """
+        config: ResourceGroupConfig = getattr(self._config, f"{resource_type}")
+        get_coordinates = self._coord_fn[resource_type]
+        coordinates = get_coordinates(config.deployment_area, config.num_resources)
+        res_config = config.resource_config
+        resources = []
+        for coord in coordinates:
+            res = GeolocationResource(
+                resource_id=next(self._resource_ids),
+                res_type=resource_type,
+                location=coord,
+                env=self._simpy_env,
+                n_cpu_cores=self._np_random.choice(res_config.cpu_cores),
+                cpu_core_speed=self._np_random.choice(res_config.cpu_core_speed),
+                memory_capacity=self._np_random.choice(res_config.memory),
+            )
+            resources.append(res)
+        return resources
+
+    def network_resources(self) -> Dict[int, Dict[int, NetworkResource]]:
+        """
+        Returns a nested dictionary with the network connectivity between
+        IoT devices and edge and cloud servers.
+
+        Returns:
+            A nested dictionary whose keys are iot device's id
+            and target server's id
+        """
+        if self._net_resources is None:
+            self._create_network_resources()
+        return self._net_resources
+
+    def _create_network_resources(self):
+        self._net_resources = defaultdict()
+        iot_devices, edge_servers, cloud_servers = self.compute_resources()
+        edge_net_conf = self._config.edge.network_config
+        cloud_net_conf = self._config.cloud.network_config
+
+        for iot_device in iot_devices:
+            iot_id = iot_device.resource_id
+            self._net_resources[iot_device.resource_id] = defaultdict()
+
+            for server in edge_servers:
+                bandwidth = self._np_random.uniform(
+                    edge_net_conf.bandwidth.min, edge_net_conf.bandwidth.max
+                )
+                distance = server.euclidean_distance(iot_device)
+                # TODO: Check how to set the latency of edge servers
+                latency = distance
+                self._net_resources[iot_id][server.resource_id] = NetworkResource(
+                    bandwidth=bandwidth, latency=latency
+                )
+
+            for server in cloud_servers:
+                bandwidth = self._np_random.uniform(
+                    cloud_net_conf.bandwidth.min, cloud_net_conf.bandwidth.max
+                )
+                proxy_latency = server.location.latency
+                latency = self._np_random.uniform(proxy_latency.min, proxy_latency.max)
+                self._net_resources[iot_id][server.resource_id] = NetworkResource(
+                    bandwidth=bandwidth, latency=latency
+                )
+
+        return self._net_resources
 
     @staticmethod
-    def grid_coordinates(
+    def _grid_coordinates(
         area: RectGeographicalArea, num_locations: int
     ) -> List[Coordinate]:
         """
@@ -290,7 +410,7 @@ class ResourceManager:
 
         return locations[:num_locations]
 
-    def random_coordinates(
+    def _random_coordinates(
         self, area: RectGeographicalArea, num_locations: int
     ) -> List[Coordinate]:
         """
@@ -305,7 +425,7 @@ class ResourceManager:
             A list of coordinates.
         """
         lat_values = self._np_random.uniform(
-           area.southeast.lat,  area.northwest.lat, size=num_locations
+            area.southeast.lat, area.northwest.lat, size=num_locations
         )
         long_values = self._np_random.uniform(
             area.northwest.long, area.southeast.long, size=num_locations
@@ -315,7 +435,7 @@ class ResourceManager:
         ]
         return locations
 
-    def cloud_coordinates(
+    def _cloud_coordinates(
         self, sites: List[CloudSite], num_locations: int
     ) -> List[CloudSite]:
         """
@@ -332,50 +452,17 @@ class ResourceManager:
         indices = self._np_random.choice(len(sites), num_locations)
         return [sites[i] for i in indices]
 
-    def create_resources(self) -> List[GeolocationResource]:
-        """Creates the required resources for a discrete event simulation."""
-        resources = []
-        for res_type in [ResourceType.IOT, ResourceType.EDGE, ResourceType.CLOUD]:
-            resources += self.create_resource_group(res_type)
-        return resources
-
-    def create_resource_group(self, resource_type: ResourceType):
-        """
-        Creates the required resources of a given type.
-
-        Args:
-            resource_type: the type of resource to create (cloud, edge, iot).
-
-        Returns:
-            The list of resources.
-        """
-        config: ResourceGroupConfig = getattr(self._config, f"{resource_type}")
-        get_coordinates = self._coord_fn[resource_type]
-        coordinates = get_coordinates(config.deployment_area, config.num_resources)
-        res_config = config.resource_config
-        return [
-            GeolocationResource(
-                resource_id=next(self._resource_ids),
-                res_type=resource_type,
-                latitude=coord.lat,
-                longitude=coord.long,
-                env=self._simpy_env,
-                n_cpu_cores=self._np_random.choice(res_config.cpu_cores),
-                cpu_core_speed=self._np_random.choice(res_config.cpu_core_speed),
-                memory_capacity=self._np_random.choice(res_config.memory),
-            )
-            for coord in coordinates
-        ]
-
 
 @dataclass(frozen=True)
 class ComputingEnvironment:
     """
     This class represents the computing infrastructure to use
-    for a given discrete event simulation.
+    for a given discrete event simulation.latencies: int =
     """
+
     simpy_env: simpy.Environment
-    resources: Dict[int, GeolocationResource]
+    comp_resources: Dict[int, GeolocationResource]
+    net_resources: Dict[int, Dict[int, NetworkResource]]
 
     @staticmethod
     def build(
@@ -400,7 +487,20 @@ class ComputingEnvironment:
         rand, seed = seeding.np_random(seed)
         res_mgmt = ResourceManager(simpy_env=simpy_env, np_random=rand, config=config)
 
-        resources = res_mgmt.create_resources()
-        resource_dict = {resource.resource_id: resource for resource in resources}
+        iot_devices, edge_servers, cloud_servers = res_mgmt.compute_resources()
+        resource_dict = {
+            resource.resource_id: resource
+            for resource in iot_devices + edge_servers + cloud_servers
+        }
 
-        return ComputingEnvironment(simpy_env=simpy_env, resources=resource_dict)
+        net_resources = res_mgmt.network_resources()
+
+        return ComputingEnvironment(
+            simpy_env=simpy_env,
+            comp_resources=resource_dict,
+            net_resources=net_resources,
+        )
+
+    def clone(self) -> ComputingEnvironment:
+        """Returns a deep copy of the computing environment."""
+        return copy.deepcopy(self)

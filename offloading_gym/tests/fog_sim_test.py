@@ -41,15 +41,16 @@ class TestSimulation(unittest.TestCase):
         """Simulates task execution using simpy"""
         with resource.request(cpu_cores=n_cores, memory=memory) as req:
             yield req
-            start_time = resource.env.now
+            # start_time = resource.env.now
             yield resource.env.timeout(5.0)
-            finish_time = resource.env.now
+            # finish_time = resource.env.now
 
     def test_create_infra(self):
         fog_env = ComputingEnvironment.build(
             simpy_env=self.env, seed=42, config=config.DEFAULT_COMP_CONFIG
         )
-        self.assertEqual(len(fog_env.resources), 57)
-        iot_device = fog_env.resources[0]
+        self.assertEqual(len(fog_env.comp_resources), 57)
+        iot_device = fog_env.comp_resources[0]
         self.assertEqual(iot_device.resource_id, 0)
         self.assertEqual(iot_device.resource_type, config.ResourceType.IOT)
+        print(fog_env.net_resources[0][3])
