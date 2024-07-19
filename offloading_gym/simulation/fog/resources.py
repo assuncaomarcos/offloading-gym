@@ -467,8 +467,8 @@ class ComputingEnvironment:
     @staticmethod
     def build(
         *,
-        simpy_env: simpy.Environment,
         seed: Optional[int] = None,
+        simpy_env: Optional[simpy.Environment] = None,
         config: Optional[ComputingConfig] = DEFAULT_COMP_CONFIG,
     ) -> ComputingEnvironment:
         """
@@ -485,6 +485,10 @@ class ComputingEnvironment:
 
         # Initialize the RNG
         rand, seed = seeding.np_random(seed)
+
+        if simpy_env is None:
+            simpy_env = simpy.Environment()
+
         res_mgmt = ResourceManager(simpy_env=simpy_env, np_random=rand, config=config)
 
         iot_devices, edge_servers, cloud_servers = res_mgmt.compute_resources()

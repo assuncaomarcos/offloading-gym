@@ -4,7 +4,7 @@
 import simpy
 from typing import List, Union
 from dataclasses import dataclass
-from resources import ComputingEnvironment, GeolocationResource
+from .resources import ComputingEnvironment, GeolocationResource
 from offloading_gym.task_graph import TaskAttr, TaskTuple
 from .config import ResourceType
 

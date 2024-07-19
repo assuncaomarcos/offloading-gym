@@ -38,6 +38,7 @@ class RectGeographicalArea:
     Set of geographical coordinates that form a rectangular area
     on which edge resources are deployed.
     """
+
     northeast: Coordinate
     northwest: Coordinate
     southeast: Coordinate
@@ -45,7 +46,7 @@ class RectGeographicalArea:
 
     def __post_init__(self):
         if not self._is_rectangle():
-            raise ValueError('Set of coordinates is not a rectangular area.')
+            raise ValueError("Set of coordinates is not a rectangular area.")
 
     def _is_rectangle(self):
         # Check to see if the coordinates form a rectangle
@@ -119,6 +120,17 @@ class ComputingConfig:
     edge: ResourceGroupConfig
     cloud: ResourceGroupConfig
 
+    def num_compute_resources(self) -> int:
+        """
+        Returns the number of compute resources (IoT devices, edge servers,
+        and cloud servers) to be created according as per this configuration
+        object.
+
+        Returns:
+            The number of compute resources.
+        """
+        return self.iot.num_resources + self.edge.num_resources + self.cloud.num_resources
+
 
 def _load_latency_info() -> List[CloudSite]:
     with files(__package__).joinpath("latencies.csv").open() as lat_file:
@@ -127,7 +139,8 @@ def _load_latency_info() -> List[CloudSite]:
     sites = []
     for _, row in df.iterrows():
         site = CloudSite(
-            lat=row["latitude"], long=row["longitude"],
+            lat=row["latitude"],
+            long=row["longitude"],
             title=row["title"],
             country=row["country"],
             latency=Interval(min=row["min_latency"], max=row["max_latency"]),
