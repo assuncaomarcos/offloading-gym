@@ -131,6 +131,27 @@ class ComputingConfig:
         """
         return self.iot.num_resources + self.edge.num_resources + self.cloud.num_resources
 
+    def max_attribute_value(self, attribute: str) -> int:
+        """Returns the maximum value of an attribute a resource in the environment has."""
+        max_value = 0
+        for group in [self.iot, self.edge, self.cloud]:
+            attribute_list = getattr(group.resource_config, attribute, None)
+            if attribute_list:
+                max_value = max(max_value, *attribute_list)
+        return max_value
+
+    def max_number_cores(self) -> int:
+        """Returns the maximum number of cores a resource in the environment has."""
+        return self.max_attribute_value('cpu_cores')
+
+    def max_core_speed(self) -> int:
+        """Returns the maximum speed a compute core in the environment has."""
+        return self.max_attribute_value('cpu_core_speed')
+
+    def max_memory(self) -> int:
+        """Returns the maximum memory size a compute resource in the environment has."""
+        return self.max_attribute_value('memory')
+
 
 def _load_latency_info() -> List[CloudSite]:
     with files(__package__).joinpath("latencies.csv").open() as lat_file:
