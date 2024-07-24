@@ -13,7 +13,7 @@ class TestFogEnv(unittest.TestCase):
         try:
             gym.make(
                 "FogPlacement-v0",
-                **{"tasks_per_app": 30},
+                **{},
             )
         except gym.error.Error as error:
             self.fail(f"Unexpected error: {error}")
@@ -21,6 +21,6 @@ class TestFogEnv(unittest.TestCase):
     def test_reset_env(self):
         env = gym.make(
                 "FogPlacement-v0",
-                **{"tasks_per_app": 30},
+                **{},
             )
         env.reset(seed=42)

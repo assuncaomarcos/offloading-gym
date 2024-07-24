@@ -16,9 +16,9 @@ import numpy as np
 import simpy
 
 from offloading_gym.simulation.fog.resources import ComputingEnvironment, GeolocationResource
-from offloading_gym.simulation.fog.config import ComputingConfig, DEFAULT_COMP_CONFIG
+from offloading_gym.simulation.fog.config import ComputingConfig, DEFAULT_COMP_CONFIG, DEFAULT_WORKLOAD_CONFIG
 from offloading_gym.task_graph import TaskGraph, TaskTuple, TaskAttr
-from offloading_gym.envs.workload import RandomGraphWorkload
+from offloading_gym.envs.workload import FogDAGWorkload
 
 from .base import BaseOffEnv
 from .mixins import TaskGraphMixin
@@ -27,6 +27,7 @@ from .mixins import TaskGraphMixin
 TASKS_PER_APPLICATION = 20
 MIN_MAX_LATITUDE = (-90, 90)
 MIN_MAX_LONGITUDE = (-180, 180)
+CYCLES_IN_GHZ = 1000000000
 
 
 R = TypeVar('R')
@@ -130,19 +131,20 @@ class TaskEncoder(StateEncoder[TaskAttr]):
 class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     action_space: gym.spaces.Discrete
     observation_space: gym.spaces.Dict
-    workload: Workload
+    workload: FogDAGWorkload
     server_encoder: ServerEncoder
     task_encoder: TaskEncoder
     computing_config: Union[ComputingConfig, None]
     computing_env: Union[ComputingEnvironment, None]
     task_graph: Union[TaskGraph, None]  # Current task graph
-    tasks_per_app: int
 
-    _task_list: Union[List[TaskTuple], None]  # To avoid sorting tasks multiple times
+    # To avoid sorting tasks multiple times
+    _task_list: Union[List[TaskTuple], None]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.computing_config = kwargs.get("computing_config", DEFAULT_COMP_CONFIG)
+        self.workload_config = kwargs.get("workload_config", DEFAULT_WORKLOAD_CONFIG)
         self.computing_env = None
 
         self.server_encoder = kwargs.get(
@@ -155,7 +157,6 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
                 comp_config=self.computing_config
             )
         )
-        self._tasks_per_app = kwargs.get("tasks_per_app", TASKS_PER_APPLICATION)
         self._setup_spaces()
         self._build_simulation(kwargs)
 
@@ -184,15 +185,19 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         # print(self.observation_space)
 
     def _build_simulation(self, kwargs):
-        ...
+        self.workload = FogDAGWorkload.build(self.workload_config)
 
-    def _setup_comp_env(self, seed: int) -> ComputingEnvironment:
+    def _setup_computing_env(self, seed: int) -> ComputingEnvironment:
         simpy_env = simpy.Environment()
         return ComputingEnvironment.build(
             seed=seed,
             simpy_env=simpy_env,
             config=self.computing_config,
         )
+
+    def _compute_task_runtime(self, task: TaskAttr) -> float:
+        iot_device = self.computing_env.iot_devices[0]
+        return task.processing_demand / (iot_device.cpu_core_speed * CYCLES_IN_GHZ)
 
     def reset(
         self,
@@ -201,8 +206,14 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         options: Optional[dict] = None,
     ) -> Tuple[Dict[str, NDArray[np.float32]], dict[str, Any]]:
         super().reset(seed=seed)
+        self.workload.reset(seed=seed)
+
+        # Use only the first task graph
+        self.task_graph = self.workload.step(offset=0)[0]
+        self.compute_task_ranks(self.task_graph, self._compute_task_runtime)
+
         if not self.computing_env:
-            self.computing_env = self._setup_comp_env(seed=seed)
+            self.computing_env = self._setup_computing_env(seed=seed)
 
         return self._get_ob(), {}
 

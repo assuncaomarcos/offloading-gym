@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List, Dict, Callable, Optional, Union, Tuple
 from dataclasses import dataclass
 from collections import defaultdict
+from functools import cached_property
 
 import math
 import itertools
@@ -508,3 +509,10 @@ class ComputingEnvironment:
     def clone(self) -> ComputingEnvironment:
         """Returns a deep copy of the computing environment."""
         return copy.deepcopy(self)
+
+    def _filter_resources_by_type(self, desired_type: ResourceType) -> List[GeolocationResource]:
+        return [v for _, v in self.comp_resources.items() if v.resource_type == desired_type]
+
+    @cached_property
+    def iot_devices(self) -> List[GeolocationResource]:
+        return self._filter_resources_by_type(ResourceType.IOT)

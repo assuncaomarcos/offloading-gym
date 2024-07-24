@@ -15,8 +15,8 @@ More details on the Wonderproxy dataset can be found
 
 from __future__ import annotations
 
-from typing import List, NamedTuple, Union, AnyStr
-from dataclasses import dataclass
+from typing import List, NamedTuple, Union, AnyStr, Dict, Any
+from dataclasses import dataclass, asdict
 from enum import Enum
 
 from importlib.resources import files
@@ -167,6 +167,9 @@ class WorkloadConfig:
     fat_values: List[float]
     ccr_values: List[float]
     jump_values: List[int]
+
+    def as_dict(self) -> Dict[AnyStr, Any]:
+        return asdict(self)
 
 
 def _load_latency_info() -> List[CloudSite]:
