@@ -8,15 +8,17 @@ placement of task DAGs onto fog resources.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Any, Tuple, Dict, Union, Callable, List
+from typing import Optional, Any, Tuple, Dict, Union, List, Generic, TypeVar
 from numpy.typing import NDArray
 
 import gymnasium as gym
 import numpy as np
+import simpy
 
 from offloading_gym.simulation.fog.resources import ComputingEnvironment, GeolocationResource
 from offloading_gym.simulation.fog.config import ComputingConfig, DEFAULT_COMP_CONFIG
-from offloading_gym.task_graph import TaskGraph, TaskTuple
+from offloading_gym.task_graph import TaskGraph, TaskTuple, TaskAttr
+from offloading_gym.envs.workload import RandomGraphWorkload
 
 from .base import BaseOffEnv
 from .mixins import TaskGraphMixin
@@ -27,49 +29,59 @@ MIN_MAX_LATITUDE = (-90, 90)
 MIN_MAX_LONGITUDE = (-180, 180)
 
 
-class ABCServerEncoder(ABC, Callable[[GeolocationResource], NDArray[np.float32]]):
-    """
-    Abstract class for creating server encoders, used to encode a server's
-    attributes as a numpy array.
-    """
+R = TypeVar('R')
+
+
+@dataclass
+class StateEncoder(ABC, Generic[R]):
+    high: NDArray[np.float32] = field(init=False)
+    low: NDArray[np.float32] = field(init=False)
 
     @abstractmethod
-    def __call__(self, resource: GeolocationResource) -> NDArray[np.float32]:
+    def __call__(self, obj: R) -> NDArray[np.float32]:
+        ...
+
+    def __post_init__(self):
+        self.high = self._provide_high()
+        self.low = self._provide_low()
+
+    @abstractmethod
+    def _provide_high(self) -> NDArray[np.float32]:
         ...
 
     @abstractmethod
-    def low_high_values(self) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
-        """Returns the low and high values for each resource feature"""
+    def _provide_low(self) -> NDArray[np.float32]:
+        ...
 
-    @abstractmethod
+    @property
     def num_features(self) -> int:
         """Returns the number of server features considered by this encoder"""
+        return self.high.size
 
 
-@dataclass(frozen=True)
-class ServerEncoder(ABCServerEncoder):
+@dataclass
+class ServerEncoder(StateEncoder[GeolocationResource]):
     """Default class used to encode a server's attributes as a numpy array."""
     comp_config: ComputingConfig
-    high: NDArray[np.float32]
-    low: NDArray[np.float32]
 
-    def __init__(self, comp_config: ComputingConfig):
-        self.comp_config = comp_config
-        max_num_cores = comp_config.max_number_cores()
-        max_memory = comp_config.max_memory()
-        self.high = np.array(
+    def _provide_high(self) -> NDArray[np.float32]:
+        max_num_cores = self.comp_config.max_number_cores()
+        max_memory = self.comp_config.max_memory()
+        return np.array(
             [
-                comp_config.num_compute_resources() - 1,
+                self.comp_config.num_compute_resources() - 1,
                 max_num_cores,
-                comp_config.max_core_speed(),
+                self.comp_config.max_core_speed(),
                 max_memory,
                 MIN_MAX_LATITUDE[1],
                 MIN_MAX_LONGITUDE[1],
-                max_num_cores,  # max available cores
-                max_memory,     # max available memory
-                1.0], dtype=np.float32
+                max_num_cores,      # max available cores
+                max_memory         # max available memory
+            ], dtype=np.float32
         )
-        self.low = np.array(
+
+    def _provide_low(self) -> NDArray[np.float32]:
+        return np.array(
             [
                 0.0,  # resource id
                 0.0,  # min number of cores
@@ -78,65 +90,108 @@ class ServerEncoder(ABCServerEncoder):
                 MIN_MAX_LATITUDE[0],
                 MIN_MAX_LONGITUDE[0],
                 0.0,  # min available cores
-                0.0], # min available memory
+                0.0],  # min available memory
             dtype=np.float32
         )
 
-    def __call__(self, resource: GeolocationResource) -> NDArray[np.float32]:
+    def __call__(self, obj: GeolocationResource) -> NDArray[np.float32]:
         return np.array(
             object=[
-                resource.resource_id,
-                resource.number_of_cores,
-                resource.cpu_core_speed,
-                resource.memory_capacity,
-                resource.location.lat,
-                resource.location.long,
-                resource.available_cpu_cores,
-                resource.available_memory
+                obj.resource_id,
+                obj.number_of_cores,
+                obj.cpu_core_speed,
+                obj.memory_capacity,
+                obj.location.lat,
+                obj.location.long,
+                obj.available_cpu_cores,
+                obj.available_memory
                 # queueing delay
             ],
             dtype=np.float32
         )
 
-    def low_high_values(self) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
-        return self.low, self.high
 
-    def num_features(self) -> int:
-        return self.high.size
+@dataclass
+class TaskEncoder(StateEncoder[TaskAttr]):
+    comp_config: ComputingConfig
+
+    def _provide_high(self) -> NDArray[np.float32]:
+        return np.array([1.0], dtype=np.float32)
+
+    def _provide_low(self) -> NDArray[np.float32]:
+        return np.array([0.0], dtype=np.float32)
+
+    def __call__(self, obj: TaskAttr) -> NDArray[np.float32]:
+        return np.array([
+            obj.processing_demand
+        ], dtype=np.float32)
 
 
 class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     action_space: gym.spaces.Discrete
     observation_space: gym.spaces.Dict
-    _computing_config: Union[ComputingConfig, None]
-    _computing_env: Union[ComputingEnvironment, None]
-    _tasks_per_app: int
-    _server_encoder: ServerEncoder
+    workload: Workload
+    server_encoder: ServerEncoder
+    task_encoder: TaskEncoder
+    computing_config: Union[ComputingConfig, None]
+    computing_env: Union[ComputingEnvironment, None]
+    task_graph: Union[TaskGraph, None]  # Current task graph
+    tasks_per_app: int
 
-    # Current task graph
-    _task_graph: Union[TaskGraph, None]
-
-    # To avoid having to sort tasks multiple times for scheduling
-    _task_list: Union[List[TaskTuple], None]
+    _task_list: Union[List[TaskTuple], None]  # To avoid sorting tasks multiple times
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._computing_config = kwargs.get("computing_config", DEFAULT_COMP_CONFIG)
-        self._server_encoder = kwargs.get("server_encoder", ServerEncoder(self._computing_config))
+        self.computing_config = kwargs.get("computing_config", DEFAULT_COMP_CONFIG)
+        self.computing_env = None
+
+        self.server_encoder = kwargs.get(
+            "server_encoder", ServerEncoder(
+                comp_config=self.computing_config
+            )
+        )
+        self.task_encoder = kwargs.get(
+            "task_encoder", TaskEncoder(
+                comp_config=self.computing_config
+            )
+        )
         self._tasks_per_app = kwargs.get("tasks_per_app", TASKS_PER_APPLICATION)
-        self._computing_env = None
         self._setup_spaces()
+        self._build_simulation(kwargs)
 
     def _setup_spaces(self):
         self.action_space = gym.spaces.Discrete(
-            n=self._computing_config.num_compute_resources()
+            n=self.computing_config.num_compute_resources()
         )
-        num_servers = self._computing_config.num_compute_resources()
+        num_servers = self.computing_config.num_compute_resources()
+        server_min, server_max = min(self.server_encoder.low), max(self.server_encoder.high)
+        task_min, task_max = min(self.task_encoder.low), max(self.task_encoder.high)
         self.observation_space = gym.spaces.Dict(
             {
-                "servers": gym.spaces.Box(-1, 1, shape=(num_servers, self._server_encoder.num_features())),
-                "task": gym.spaces.Box(-1, 1, shape=(self._tasks_per_app,))
+                "servers": gym.spaces.Box(
+                    low=server_min,
+                    high=server_max,
+                    shape=(num_servers, self.server_encoder.num_features)
+                ),
+                "task": gym.spaces.Box(
+                    low=task_min,
+                    high=task_max,
+                    shape=(self.task_encoder.num_features,)
+                )
             }
+        )
+
+        # print(self.observation_space)
+
+    def _build_simulation(self, kwargs):
+        ...
+
+    def _setup_comp_env(self, seed: int) -> ComputingEnvironment:
+        simpy_env = simpy.Environment()
+        return ComputingEnvironment.build(
+            seed=seed,
+            simpy_env=simpy_env,
+            config=self.computing_config,
         )
 
     def reset(
@@ -144,9 +199,16 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         *,
         seed: Optional[int] = None,
         options: Optional[dict] = None,
-    ) -> Tuple[NDArray[np.float32], dict[str, Any]]:
+    ) -> Tuple[Dict[str, NDArray[np.float32]], dict[str, Any]]:
         super().reset(seed=seed)
+        if not self.computing_env:
+            self.computing_env = self._setup_comp_env(seed=seed)
 
+        return self._get_ob(), {}
+
+    def _get_ob(self) -> Dict[str, NDArray[np.float32]]:
+        assert self.state is not None, "Call reset before using FogPlacementEnv."
+        return self.state
 
     def step(self, action: int) -> Tuple[
         NDArray[np.float32],
@@ -157,6 +219,18 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     ]:
         ...
 
+    def _server_embedding(self) -> NDArray[np.float32]:
+        resources = self.computing_env.comp_resources.values()
+        server_arrays = [self.server_encoder(resource) for resource in resources]
+        return np.stack(server_arrays, axis=0)
+
+    def _task_embedding(self) -> NDArray[np.float32]:
+        ...
+
     @property
-    def state(self):
-        pass
+    def state(self) -> Dict[str, NDArray[np.float32]]:
+        # print(self._server_embedding())
+        return {
+            "servers": self._server_embedding(),
+            "task": np.array([0], dtype=np.float32)
+        }

@@ -153,6 +153,22 @@ class ComputingConfig:
         return self.max_attribute_value('memory')
 
 
+@dataclass(frozen=True)
+class WorkloadConfig:
+    num_tasks: List[int]
+    min_computing: int
+    max_computing: int
+    min_memory: float
+    max_memory: float
+    min_datasize: int
+    max_datasize: int
+    density_values: List[float]
+    regularity_values: List[float]
+    fat_values: List[float]
+    ccr_values: List[float]
+    jump_values: List[int]
+
+
 def _load_latency_info() -> List[CloudSite]:
     with files(__package__).joinpath("latencies.csv").open() as lat_file:
         df = pd.read_csv(lat_file)
@@ -212,4 +228,19 @@ DEFAULT_COMP_CONFIG = ComputingConfig(
         network_config=NetworkConfig(bandwidth=Interval(min=4, max=8)),
         deployment_area=server_info(),
     ),
+)
+
+DEFAULT_WORKLOAD_CONFIG = WorkloadConfig(
+    num_tasks=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
+    min_computing=(10 ** 7),
+    max_computing=(3 * 10 ** 8),
+    min_memory=25,
+    max_memory=100,
+    min_datasize=51200,  # Each task produces between 50KB and 200KB of data
+    max_datasize=204800,
+    density_values=[0.4, 0.5, 0.6, 0.7, 0.8],
+    regularity_values=[0.2, 0.5, 0.8],
+    fat_values=[0.4, 0.5, 0.6, 0.7, 0.8],
+    ccr_values=[0.3, 0.4, 0.5],
+    jump_values=[1, 2],
 )

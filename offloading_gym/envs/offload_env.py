@@ -55,7 +55,7 @@ import networkx as nx
 import math
 
 from offloading_gym.envs.base import BaseOffEnv
-from offloading_gym.envs.workload import build_workload
+from offloading_gym.envs.workload import RandomGraphWorkload
 from offloading_gym.task_graph import TaskGraph, TaskAttr, TaskTuple
 from offloading_gym.utils import arrays
 from offloading_gym.workload import Workload
@@ -93,7 +93,6 @@ DEFAULT_CLUSTER_CONFIG = {
 }
 
 DEFAULT_WORKLOAD_CONFIG = {
-    "type": "random_dag",
     "num_tasks": 20,  # Make sure this is set when using this config
     "min_computing": 10**7,  # Each task requires between 10^7 and 10^8 cycles
     "max_computing": 10**8,
@@ -182,7 +181,7 @@ class BinaryOffloadEnv(BaseOffEnv):
     def _build_simulation(self, kwargs):
         workload_config = kwargs.get("workload", DEFAULT_WORKLOAD_CONFIG)
         workload_config["num_tasks"] = self.tasks_per_app
-        self.workload = build_workload(workload_config)
+        self.workload = RandomGraphWorkload.build(workload_config)
 
         cluster_config = kwargs.get("cluster", DEFAULT_CLUSTER_CONFIG)
         self.cluster = Cluster(**cluster_config)

@@ -3,7 +3,7 @@
 
 from offloading_gym.workload import RandomDAGGenerator
 
-__all__ = ["build_workload"]
+__all__ = ["RandomGraphWorkload"]
 
 
 class RandomGraphWorkload(RandomDAGGenerator):
@@ -11,15 +11,8 @@ class RandomGraphWorkload(RandomDAGGenerator):
     def __init__(self, length: int = 0, **kwargs):
         super().__init__(length, **kwargs)
 
-    @staticmethod
-    def build(**kwargs):
+    @classmethod
+    def build(cls, args: dict):
+        kwargs = {k: v for k, v in args.items()}
         return RandomGraphWorkload(**kwargs)
 
-
-def build_workload(workload_config: dict):
-    wkl_type = workload_config["type"]
-    kwargs = {k: v for k, v in workload_config.items() if k != "type"}
-    if wkl_type == "random_dag":
-        return RandomGraphWorkload.build(**kwargs)
-    else:
-        raise RuntimeError(f"Unsupported workload type {wkl_type}")
