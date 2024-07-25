@@ -23,6 +23,7 @@ class FogTaskAttr(TaskAttr):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self['resource_id'] = -1
 
     @property
     def memory(self) -> int:
@@ -43,6 +44,19 @@ class FogTaskAttr(TaskAttr):
     def rank(self, value: float) -> None:
         """Set the task rank."""
         self['rank'] = value
+
+    @property
+    def resource_id(self) -> int:
+        """
+        The id of the resource to which the task has been assigned ;
+        -1 if unknown.
+        """
+        return self['resource_id']
+
+    @resource_id.setter
+    def resource_id(self, value: int) -> None:
+        """Sets the id of the resource to which the task has been assigned"""
+        self['resource_id'] = value
 
 
 class FogDAGWorkload(RandomDAGGenerator):

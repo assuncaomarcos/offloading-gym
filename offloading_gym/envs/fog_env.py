@@ -34,8 +34,9 @@ MIN_MAX_LONGITUDE = (-180, 180)
 CYCLES_IN_GHZ = 1000000000
 
 # Number of preceding and downstream tasks to consider in the dependency model
-NUM_TASK_SUCCESSORS = 6
-NUM_TASK_PREDECESSORS = NUM_TASK_SUCCESSORS
+NUM_TASK_PREDECESSORS = 6
+NUM_TASK_SUCCESSORS = NUM_TASK_PREDECESSORS
+NUM_PLACEMENT_TASKS = NUM_TASK_PREDECESSORS
 
 
 R = TypeVar('R')
@@ -127,22 +128,25 @@ class TaskEncoder(StateEncoder[Tuple[TaskGraph, FogTaskAttr]]):
 
     def _provide_high(self) -> NDArray[np.float32]:
         max_num_tasks = max(self.workload_config.num_tasks)
+        id_last_resource = self.comp_config.num_compute_resources() - 1
         dependency_highs = np.full(NUM_TASK_SUCCESSORS + NUM_TASK_PREDECESSORS, max_num_tasks)
+        placement_highs = np.full(NUM_PLACEMENT_TASKS, id_last_resource)
 
         highs = np.array([
             self.workload_config.max_computing,
             self.workload_config.max_memory], dtype=np.float32
         )
-        return np.concatenate((highs, dependency_highs))
+        return np.concatenate((highs, dependency_highs, placement_highs))
 
     def _provide_low(self) -> NDArray[np.float32]:
         dependency_lows = np.full(NUM_TASK_SUCCESSORS + NUM_TASK_PREDECESSORS, -1.0)
+        placement_lows = np.full(NUM_PLACEMENT_TASKS, -1.0)
 
         lows = np.array([
             self.workload_config.min_computing,
             self.workload_config.min_memory], dtype=np.float32
         )
-        return np.concatenate((lows, dependency_lows))
+        return np.concatenate((lows, dependency_lows, placement_lows))
 
     def _task_dependencies(self, task_graph: TaskGraph, task_id: int) -> List[int]:
         task_predecessors = list(task_graph.pred[task_id].keys())
@@ -152,12 +156,21 @@ class TaskEncoder(StateEncoder[Tuple[TaskGraph, FogTaskAttr]]):
             pad_value=-1.0,
         )
 
+        placement_predecessors = [
+            task_attr.resource_id for task_attr in task_graph.predecessors(task_id)
+        ]
+        placement_predecessors = arrays.pad_list(
+            lst=placement_predecessors,
+            target_length=NUM_PLACEMENT_TASKS,
+            pad_value=-1.0,
+        )
+
         task_successors = list(task_graph.succ[task_id].keys())
         task_successors = arrays.pad_list(
             lst=task_successors, target_length=NUM_TASK_SUCCESSORS, pad_value=-1.0
         )
 
-        return task_predecessors + task_successors
+        return task_predecessors + task_successors + placement_predecessors
 
     def __call__(self, obj: Tuple[TaskGraph, FogTaskAttr]) -> NDArray[np.float32]:
         task_graph, task_attr = obj
