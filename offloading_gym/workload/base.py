@@ -3,7 +3,7 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union
-from ..task_graph import TaskGraph
+from ..task_graph import TaskGraph, TaskAttr
 import numpy as np
 from gymnasium.utils import seeding
 
@@ -21,6 +21,8 @@ class Workload(ABC):
     length: int
     current_element: int
     _np_random: Union[np.random.Generator, None] = None
+
+    task_attr_factory = TaskAttr
 
     @abstractmethod
     def __init__(self, length: Optional[int] = 0):

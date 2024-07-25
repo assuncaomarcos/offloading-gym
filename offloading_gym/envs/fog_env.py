@@ -14,11 +14,13 @@ from numpy.typing import NDArray
 import gymnasium as gym
 import numpy as np
 import simpy
+import networkx as nx
 
 from offloading_gym.simulation.fog.resources import ComputingEnvironment, GeolocationResource
-from offloading_gym.simulation.fog.config import ComputingConfig, DEFAULT_COMP_CONFIG, DEFAULT_WORKLOAD_CONFIG
+from offloading_gym.simulation.fog.config import ComputingConfig, DEFAULT_COMP_CONFIG, DEFAULT_WORKLOAD_CONFIG, \
+    WorkloadConfig
 from offloading_gym.task_graph import TaskGraph, TaskTuple, TaskAttr
-from offloading_gym.envs.workload import FogDAGWorkload
+from offloading_gym.envs.workload import FogDAGWorkload, FogTaskAttr
 
 from .base import BaseOffEnv
 from .mixins import TaskGraphMixin
@@ -113,18 +115,26 @@ class ServerEncoder(StateEncoder[GeolocationResource]):
 
 
 @dataclass
-class TaskEncoder(StateEncoder[TaskAttr]):
+class TaskEncoder(StateEncoder[FogTaskAttr]):
     comp_config: ComputingConfig
+    workload_config: WorkloadConfig
 
     def _provide_high(self) -> NDArray[np.float32]:
-        return np.array([1.0], dtype=np.float32)
+        return np.array([
+            self.workload_config.max_computing,
+            self.workload_config.max_memory], dtype=np.float32
+        )
 
     def _provide_low(self) -> NDArray[np.float32]:
-        return np.array([0.0], dtype=np.float32)
-
-    def __call__(self, obj: TaskAttr) -> NDArray[np.float32]:
         return np.array([
-            obj.processing_demand
+            self.workload_config.min_computing,
+            self.workload_config.min_memory], dtype=np.float32
+        )
+
+    def __call__(self, obj: FogTaskAttr) -> NDArray[np.float32]:
+        return np.array([
+            obj.processing_demand,
+            obj.memory
         ], dtype=np.float32)
 
 
@@ -134,12 +144,12 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     workload: FogDAGWorkload
     server_encoder: ServerEncoder
     task_encoder: TaskEncoder
-    computing_config: Union[ComputingConfig, None]
-    computing_env: Union[ComputingEnvironment, None]
-    task_graph: Union[TaskGraph, None]  # Current task graph
+    computing_config: Union[ComputingConfig, None] = None
+    computing_env: Union[ComputingEnvironment, None] = None
+    task_graph: Union[TaskGraph, None] = None # Current task graph
 
     # To avoid sorting tasks multiple times
-    _task_list: Union[List[TaskTuple], None]
+    task_list: Union[List[TaskTuple], None] = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -154,7 +164,8 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         )
         self.task_encoder = kwargs.get(
             "task_encoder", TaskEncoder(
-                comp_config=self.computing_config
+                comp_config=self.computing_config,
+                workload_config=self.workload_config
             )
         )
         self._setup_spaces()
@@ -208,12 +219,19 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         super().reset(seed=seed)
         self.workload.reset(seed=seed)
 
+        if not self.computing_env:
+            self.computing_env = self._setup_computing_env(seed=seed)
+
         # Use only the first task graph
         self.task_graph = self.workload.step(offset=0)[0]
         self.compute_task_ranks(self.task_graph, self._compute_task_runtime)
 
-        if not self.computing_env:
-            self.computing_env = self._setup_computing_env(seed=seed)
+        topo_order = nx.lexicographical_topological_sort(
+            self.task_graph, key=lambda task_id: self.task_graph.nodes[task_id].rank
+        )
+
+        # Store sorted tasks to avoid having to sort it multiple times
+        self.task_list = [(node, self.task_graph.nodes[node]) for node in topo_order]
 
         return self._get_ob(), {}
 
@@ -236,12 +254,12 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         return np.stack(server_arrays, axis=0)
 
     def _task_embedding(self) -> NDArray[np.float32]:
-        ...
+        task_arrays = [self.task_encoder(task_attr) for _, task_attr in self.task_list]
+        return np.stack(task_arrays, axis=0)
 
     @property
     def state(self) -> Dict[str, NDArray[np.float32]]:
-        # print(self._server_embedding())
         return {
             "servers": self._server_embedding(),
-            "task": np.array([0], dtype=np.float32)
+            "task": self._task_embedding()
         }

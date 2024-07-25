@@ -104,7 +104,9 @@ class TaskView(NodeView[TaskAttr], Mapping[Any, TaskAttr], Set[TaskAttr]):
 
 class TaskGraph(DiGraph):
     """ Represents a task graph as a NetworkX DiGraph."""
-    _nodes: dict[int, TaskAttr]
+    node_attr_dict_factory = TaskAttr
+    edge_attr_dict_factory = EdgeAttr
+    _nodes: dict[int, node_attr_dict_factory]
 
     def __init__(self, **attr):
         super().__init__(**attr)
@@ -113,9 +115,6 @@ class TaskGraph(DiGraph):
     def tasks(self) -> TaskView:
         """The tasks in the task graph"""
         return TaskView(self)
-
-    node_attr_dict_factory = TaskAttr
-    edge_attr_dict_factory = EdgeAttr
 
 
 TaskTuple = Tuple[int, TaskAttr]

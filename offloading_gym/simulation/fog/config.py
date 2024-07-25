@@ -23,6 +23,8 @@ from importlib.resources import files
 
 import pandas as pd
 
+BYTES_IN_MB = 2 ** 20
+
 
 @dataclass(frozen=True)
 class Coordinate:
@@ -158,8 +160,8 @@ class WorkloadConfig:
     num_tasks: List[int]
     min_computing: int
     max_computing: int
-    min_memory: float
-    max_memory: float
+    min_memory: int
+    max_memory: int
     min_datasize: int
     max_datasize: int
     density_values: List[float]
@@ -237,8 +239,8 @@ DEFAULT_WORKLOAD_CONFIG = WorkloadConfig(
     num_tasks=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
     min_computing=(10 ** 7),
     max_computing=(3 * 10 ** 8),
-    min_memory=25,
-    max_memory=100,
+    min_memory=25 * BYTES_IN_MB,
+    max_memory=100 * BYTES_IN_MB,
     min_datasize=51200,  # Each task produces between 50KB and 200KB of data
     max_datasize=204800,
     density_values=[0.4, 0.5, 0.6, 0.7, 0.8],

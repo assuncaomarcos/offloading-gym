@@ -49,7 +49,7 @@ class RandomDAGGenerator(Workload):
     def random_daggen_params(self):
         return {
             "rng": self.np_random,
-            "num_tasks": self.num_tasks,
+            "num_tasks": random.choice(self.num_tasks),
             "density": random.choice(self.densities),
             "fat": random.choice(self.fat_values),
             "regularity": random.choice(self.regularities),
@@ -70,7 +70,7 @@ class RandomDAGGenerator(Workload):
             tasks.append(
                 (
                     node_id,
-                    TaskAttr(
+                    self.task_attr_factory(
                         task_id=node_id,
                         processing_demand=data["processing_demand"],
                         task_size=data[
@@ -91,6 +91,7 @@ class RandomDAGGenerator(Workload):
             )
 
         task_graph = TaskGraph()
+        task_graph.node_attr_dict_factory = self.task_attr_factory
         task_graph.add_nodes_from(tasks)
         task_graph.add_edges_from(edges)
         return task_graph

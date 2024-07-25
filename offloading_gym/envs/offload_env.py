@@ -93,7 +93,7 @@ DEFAULT_CLUSTER_CONFIG = {
 }
 
 DEFAULT_WORKLOAD_CONFIG = {
-    "num_tasks": 20,  # Make sure this is set when using this config
+    "num_tasks": [20],       # Make sure this is set when using this config
     "min_computing": 10**7,  # Each task requires between 10^7 and 10^8 cycles
     "max_computing": 10**8,
     "min_datasize": 5120,  # Each task produces between 5KB and 50KB of data
