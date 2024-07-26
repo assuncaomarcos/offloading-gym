@@ -12,3 +12,4 @@ from offloading_gym.simulation.fog.resources import (
     ComputingEnvironment,
 )
 from offloading_gym.simulation.fog import config
+from offloading_gym.simulation.fog.fogsimulation import FogSimulation, TaskRunInfo

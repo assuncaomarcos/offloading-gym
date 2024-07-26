@@ -16,9 +16,21 @@ import numpy as np
 import simpy
 import networkx as nx
 
-from offloading_gym.simulation.fog.resources import ComputingEnvironment, GeolocationResource
-from offloading_gym.simulation.fog.config import ComputingConfig, DEFAULT_COMP_CONFIG, DEFAULT_WORKLOAD_CONFIG, \
-    WorkloadConfig
+from offloading_gym.simulation.fog.resources import (
+    ComputingEnvironment,
+    GeolocationResource,
+)
+from offloading_gym.simulation.fog.config import (
+    ComputingConfig,
+    DEFAULT_COMP_CONFIG,
+    DEFAULT_WORKLOAD_CONFIG,
+    WorkloadConfig,
+)
+from offloading_gym.simulation.fog.fogsimulation import (
+    FogSimulation,
+    TaskRunInfo,
+)
+
 from offloading_gym.task_graph import TaskGraph, TaskTuple, TaskAttr
 from offloading_gym.envs.workload import FogDAGWorkload, FogTaskAttr
 from offloading_gym.utils import arrays
@@ -39,7 +51,7 @@ NUM_TASK_SUCCESSORS = NUM_TASK_PREDECESSORS
 NUM_PLACEMENT_TASKS = NUM_TASK_PREDECESSORS
 
 
-R = TypeVar('R')
+R = TypeVar("R")
 
 
 @dataclass
@@ -48,20 +60,17 @@ class StateEncoder(ABC, Generic[R]):
     low: NDArray[np.float32] = field(init=False)
 
     @abstractmethod
-    def __call__(self, obj: R) -> NDArray[np.float32]:
-        ...
+    def __call__(self, obj: R) -> NDArray[np.float32]: ...
 
     def __post_init__(self):
         self.high = self._provide_high()
         self.low = self._provide_low()
 
     @abstractmethod
-    def _provide_high(self) -> NDArray[np.float32]:
-        ...
+    def _provide_high(self) -> NDArray[np.float32]: ...
 
     @abstractmethod
-    def _provide_low(self) -> NDArray[np.float32]:
-        ...
+    def _provide_low(self) -> NDArray[np.float32]: ...
 
     @property
     def num_features(self) -> int:
@@ -72,6 +81,7 @@ class StateEncoder(ABC, Generic[R]):
 @dataclass
 class ServerEncoder(StateEncoder[GeolocationResource]):
     """Default class used to encode a server's attributes as a numpy array."""
+
     comp_config: ComputingConfig
 
     def _provide_high(self) -> NDArray[np.float32]:
@@ -85,9 +95,10 @@ class ServerEncoder(StateEncoder[GeolocationResource]):
                 max_memory,
                 MIN_MAX_LATITUDE[1],
                 MIN_MAX_LONGITUDE[1],
-                max_num_cores,      # max available cores
-                max_memory         # max available memory
-            ], dtype=np.float32
+                max_num_cores,  # max available cores
+                max_memory,  # max available memory
+            ],
+            dtype=np.float32,
         )
 
     def _provide_low(self) -> NDArray[np.float32]:
@@ -100,8 +111,9 @@ class ServerEncoder(StateEncoder[GeolocationResource]):
                 MIN_MAX_LATITUDE[0],
                 MIN_MAX_LONGITUDE[0],
                 0.0,  # min available cores
-                0.0],  # min available memory
-            dtype=np.float32
+                0.0,
+            ],  # min available memory
+            dtype=np.float32,
         )
 
     def __call__(self, obj: GeolocationResource) -> NDArray[np.float32]:
@@ -114,10 +126,10 @@ class ServerEncoder(StateEncoder[GeolocationResource]):
                 obj.location.lat,
                 obj.location.long,
                 obj.available_cpu_cores,
-                obj.available_memory
+                obj.available_memory,
                 # queueing delay
             ],
-            dtype=np.float32
+            dtype=np.float32,
         )
 
 
@@ -129,12 +141,14 @@ class TaskEncoder(StateEncoder[Tuple[TaskGraph, FogTaskAttr]]):
     def _provide_high(self) -> NDArray[np.float32]:
         max_num_tasks = max(self.workload_config.num_tasks)
         id_last_resource = self.comp_config.num_compute_resources() - 1
-        dependency_highs = np.full(NUM_TASK_SUCCESSORS + NUM_TASK_PREDECESSORS, max_num_tasks)
+        dependency_highs = np.full(
+            NUM_TASK_SUCCESSORS + NUM_TASK_PREDECESSORS, max_num_tasks
+        )
         placement_highs = np.full(NUM_PLACEMENT_TASKS, id_last_resource)
 
-        highs = np.array([
-            self.workload_config.max_computing,
-            self.workload_config.max_memory], dtype=np.float32
+        highs = np.array(
+            [self.workload_config.max_computing, self.workload_config.max_memory],
+            dtype=np.float32,
         )
         return np.concatenate((highs, dependency_highs, placement_highs))
 
@@ -142,13 +156,14 @@ class TaskEncoder(StateEncoder[Tuple[TaskGraph, FogTaskAttr]]):
         dependency_lows = np.full(NUM_TASK_SUCCESSORS + NUM_TASK_PREDECESSORS, -1.0)
         placement_lows = np.full(NUM_PLACEMENT_TASKS, -1.0)
 
-        lows = np.array([
-            self.workload_config.min_computing,
-            self.workload_config.min_memory], dtype=np.float32
+        lows = np.array(
+            [self.workload_config.min_computing, self.workload_config.min_memory],
+            dtype=np.float32,
         )
         return np.concatenate((lows, dependency_lows, placement_lows))
 
-    def _task_dependencies(self, task_graph: TaskGraph, task_id: int) -> List[int]:
+    @classmethod
+    def _task_dependencies(cls, task_graph: TaskGraph, task_id: int) -> List[int]:
         task_predecessors = list(task_graph.pred[task_id].keys())
         task_predecessors = arrays.pad_list(
             lst=task_predecessors,
@@ -176,14 +191,12 @@ class TaskEncoder(StateEncoder[Tuple[TaskGraph, FogTaskAttr]]):
         task_graph, task_attr = obj
 
         dependency_array = np.array(
-            self._task_dependencies(task_graph, task_attr.task_id),
-            dtype=np.float32
+            self._task_dependencies(task_graph, task_attr.task_id), dtype=np.float32
         )
 
-        task_embedding = np.array([
-            task_attr.processing_demand,
-            task_attr.memory
-        ], dtype=np.float32)
+        task_embedding = np.array(
+            [task_attr.processing_demand, task_attr.memory], dtype=np.float32
+        )
 
         return np.concatenate((task_embedding, dependency_array))
 
@@ -199,8 +212,10 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     task_graph: Union[TaskGraph, None] = None  # Current task graph
 
     # To avoid sorting tasks multiple times
+    #TODO: Change it to queue
     _task_list: Union[List[FogTaskAttr], None] = None
     _curr_task: FogTaskAttr
+    _simulation: FogSimulation
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -208,8 +223,7 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         self.workload_config = kwargs.get("workload_config", DEFAULT_WORKLOAD_CONFIG)
         self.server_encoder = ServerEncoder(comp_config=self.computing_config)
         self.task_encoder = TaskEncoder(
-            comp_config=self.computing_config,
-            workload_config=self.workload_config
+            comp_config=self.computing_config, workload_config=self.workload_config
         )
 
         self._setup_spaces()
@@ -220,20 +234,20 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
             n=self.computing_config.num_compute_resources()
         )
         num_servers = self.computing_config.num_compute_resources()
-        server_min, server_max = min(self.server_encoder.low), max(self.server_encoder.high)
+        server_min, server_max = min(self.server_encoder.low), max(
+            self.server_encoder.high
+        )
         task_min, task_max = min(self.task_encoder.low), max(self.task_encoder.high)
         self.observation_space = gym.spaces.Dict(
             {
                 "servers": gym.spaces.Box(
                     low=server_min,
                     high=server_max,
-                    shape=(num_servers, self.server_encoder.num_features)
+                    shape=(num_servers, self.server_encoder.num_features),
                 ),
                 "task": gym.spaces.Box(
-                    low=task_min,
-                    high=task_max,
-                    shape=(self.task_encoder.num_features,)
-                )
+                    low=task_min, high=task_max, shape=(self.task_encoder.num_features,)
+                ),
             }
         )
 
@@ -264,6 +278,8 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         if not self.computing_env:
             self.computing_env = self._setup_computing_env(seed=seed)
 
+        self._simulation = FogSimulation.build(self.computing_env)
+
         # Use only the first task graph
         self.task_graph = self.workload.step(offset=0)[0]
         self.compute_task_ranks(self.task_graph, self._compute_task_runtime)
@@ -288,8 +304,7 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         bool,
         bool,
         Dict[str, Any],
-    ]:
-        ...
+    ]: ...
 
     def _server_embedding(self) -> NDArray[np.float32]:
         resources = self.computing_env.comp_resources.values()
@@ -300,5 +315,5 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     def state(self) -> Dict[str, NDArray[np.float32]]:
         return {
             "servers": self._server_embedding(),
-            "task": self.task_encoder((self.task_graph, self._curr_task))
+            "task": self.task_encoder((self.task_graph, self._curr_task)),
         }

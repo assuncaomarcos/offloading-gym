@@ -19,7 +19,7 @@ class TaskRunInfo:
     energy: float
 
 
-class Simulation:
+class FogSimulation:
     sim_env: simpy.Environment
     comp_env: ComputingEnvironment
     simulation_process: Union[simpy.Event, None]
@@ -55,3 +55,7 @@ class Simulation:
             print(f"Simulation interrupted: {interrupt.cause}")
 
         return self.task_info
+
+    @staticmethod
+    def build(comp_env: ComputingEnvironment):
+        return FogSimulation(comp_env)
