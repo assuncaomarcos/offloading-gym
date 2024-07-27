@@ -8,8 +8,9 @@ placement of task DAGs onto fog resources.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Any, Tuple, Dict, Union, List, Generic, TypeVar
+from typing import Optional, Any, Tuple, Dict, Union, List, Generic, TypeVar, Deque
 from numpy.typing import NDArray
+from collections import deque
 
 import gymnasium as gym
 import numpy as np
@@ -26,7 +27,7 @@ from offloading_gym.simulation.fog.config import (
     DEFAULT_WORKLOAD_CONFIG,
     WorkloadConfig,
 )
-from offloading_gym.simulation.fog.fogsimulation import (
+from offloading_gym.simulation.fog.simulation import (
     FogSimulation,
     TaskRunInfo,
 )
@@ -212,9 +213,7 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     task_graph: Union[TaskGraph, None] = None  # Current task graph
 
     # To avoid sorting tasks multiple times
-    #TODO: Change it to queue
-    _task_list: Union[List[FogTaskAttr], None] = None
-    _curr_task: FogTaskAttr
+    _task_queue: Union[Deque[FogTaskAttr], None] = None
     _simulation: FogSimulation
 
     def __init__(self, **kwargs):
@@ -226,8 +225,8 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
             comp_config=self.computing_config, workload_config=self.workload_config
         )
 
+        self.workload = FogDAGWorkload.build(self.workload_config)
         self._setup_spaces()
-        self._build_simulation(kwargs)
 
     def _setup_spaces(self):
         self.action_space = gym.spaces.Discrete(
@@ -250,9 +249,6 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
                 ),
             }
         )
-
-    def _build_simulation(self, kwargs):
-        self.workload = FogDAGWorkload.build(self.workload_config)
 
     def _setup_computing_env(self, seed: int) -> ComputingEnvironment:
         simpy_env = simpy.Environment()
@@ -289,8 +285,7 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         )
 
         # Store sorted tasks to avoid having to sort it multiple times
-        self._task_list = [self.task_graph.nodes[node] for node in topo_order]
-        self._curr_task = self._task_list[0]
+        self._task_queue = deque([self.task_graph.nodes[node] for node in topo_order])
 
         return self._get_ob(), {}
 
@@ -299,12 +294,18 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         return self.state
 
     def step(self, action: int) -> Tuple[
-        NDArray[np.float32],
-        np.float32,
+        Dict[str, NDArray[np.float32]],
+        float,
         bool,
         bool,
         Dict[str, Any],
-    ]: ...
+    ]:
+        task_to_executed = self._task_queue.pop()
+        self._simulation.simulate(tasks=[task_to_executed], target_resources=[action])
+
+        #TODO: Compute the reward here...
+
+        return self._get_ob(), 0.0, False, False, {}
 
     def _server_embedding(self) -> NDArray[np.float32]:
         resources = self.computing_env.comp_resources.values()
@@ -315,5 +316,10 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     def state(self) -> Dict[str, NDArray[np.float32]]:
         return {
             "servers": self._server_embedding(),
-            "task": self.task_encoder((self.task_graph, self._curr_task)),
+            "task": self.task_encoder((self.task_graph, self.current_task))
         }
+
+    @property
+    def current_task(self) -> FogTaskAttr:
+        """The current task being scheduled/executed"""
+        return self._task_queue[0]

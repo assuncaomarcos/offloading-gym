@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import simpy
 from typing import List, Union
 from dataclasses import dataclass
+
+import simpy
+
+from offloading_gym.envs.workload import FogTaskAttr
+
 from .resources import ComputingEnvironment, GeolocationResource
-from offloading_gym.task_graph import TaskAttr, TaskTuple
 from .config import ResourceType
 
 
@@ -30,23 +33,24 @@ class FogSimulation:
         self.sim_env = comp_env.simpy_env
         self.simulation_process = None
 
-    def execute_task(self, task: TaskAttr, resource: GeolocationResource):
+    def execute_task(self, task: FogTaskAttr, resource: GeolocationResource):
         with resource.request() as req:
             yield req
             start_time = self.sim_env.now
             yield self.sim_env.timeout(task.processing_demand / resource.cpu_core_speed)
             finish_time = self.sim_env.now
 
-    def task_manager(self, tasks: List[TaskTuple], scheduling: List[int]):
-        for task, resource_id in zip(tasks, scheduling):
-            _, task_attr = task
+    def task_manager(self, tasks: List[FogTaskAttr], target_resources: List[int]):
+        for task_attr, resource_id in zip(tasks, target_resources):
+            resource = self.comp_env.comp_resources[resource_id]
+            yield self.sim_env.process(self.execute_task(task_attr, resource))
 
     def simulate(
-        self, tasks: List[TaskTuple], scheduling_plan: List[int]
+        self, tasks: List[FogTaskAttr], target_resources: List[int]
     ) -> List[TaskRunInfo]:
         sim_env = self.comp_env.simpy_env
         self.simulation_process = sim_env.process(
-            self.task_manager(tasks, scheduling_plan)
+            self.task_manager(tasks, target_resources)
         )
 
         try:

@@ -5,18 +5,7 @@ from offloading_gym.workload import RandomDAGGenerator
 from offloading_gym.simulation.fog import config as fog_config
 from offloading_gym.task_graph import TaskGraph, TaskAttr
 
-__all__ = ["RandomGraphWorkload", "FogDAGWorkload", "FogTaskAttr"]
-
-
-class RandomGraphWorkload(RandomDAGGenerator):
-
-    def __init__(self, length: int = 0, **kwargs):
-        super().__init__(length, **kwargs)
-
-    @classmethod
-    def build(cls, args: dict):
-        kwargs = {k: v for k, v in args.items()}
-        return RandomGraphWorkload(**kwargs)
+__all__ = ["FogDAGWorkload", "FogTaskAttr"]
 
 
 class FogTaskAttr(TaskAttr):

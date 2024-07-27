@@ -55,7 +55,7 @@ import networkx as nx
 import math
 
 from offloading_gym.envs.base import BaseOffEnv
-from offloading_gym.envs.workload import RandomGraphWorkload
+from offloading_gym.workload import RandomDAGGenerator
 from offloading_gym.task_graph import TaskGraph, TaskAttr, TaskTuple
 from offloading_gym.utils import arrays
 from offloading_gym.workload import Workload
@@ -104,6 +104,17 @@ DEFAULT_WORKLOAD_CONFIG = {
     "ccr_values": [0.3, 0.4, 0.5],
     "jump_values": [1, 2],
 }
+
+
+class RandomGraphWorkload(RandomDAGGenerator):
+
+    def __init__(self, length: int = 0, **kwargs):
+        super().__init__(length, **kwargs)
+
+    @classmethod
+    def build(cls, args: dict):
+        kwargs = {k: v for k, v in args.items()}
+        return RandomGraphWorkload(**kwargs)
 
 
 class TaskCostEncoder(Callable[[TaskAttr], List[float]]):
