@@ -33,12 +33,37 @@ class FogSimulation:
         self.sim_env = comp_env.simpy_env
         self.simulation_process = None
 
+    def upload_task(self, num_bytes: int):
+        ...
+
+    def download_input_data(self, num_bytes: int):
+        ...
+
     def execute_task(self, task: FogTaskAttr, resource: GeolocationResource):
         with resource.request() as req:
             yield req
             start_time = self.sim_env.now
+            task.resource_id = resource.resource_id
             yield self.sim_env.timeout(task.processing_demand / resource.cpu_core_speed)
             finish_time = self.sim_env.now
+            energy = self._compute_energy(task, resource)
+            self.task_info.append(
+                TaskRunInfo(
+                    task_id=task.task_id,
+                    resource_id=resource.resource_id,
+                    finish_time=finish_time,
+                    make_span=finish_time - start_time,
+                    energy=energy,
+                    resource_type=resource.resource_type,
+                )
+            )
+
+    def _compute_energy(
+            self,
+            task: FogTaskAttr,
+            resource: GeolocationResource
+    ) -> float:
+        return 0.0
 
     def task_manager(self, tasks: List[FogTaskAttr], target_resources: List[int]):
         for task_attr, resource_id in zip(tasks, target_resources):

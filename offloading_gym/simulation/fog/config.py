@@ -171,6 +171,7 @@ class WorkloadConfig:
     jump_values: List[int]
 
     def as_dict(self) -> Dict[AnyStr, Any]:
+        """Returns the workload configuration as a dict"""
         return asdict(self)
 
 
@@ -239,6 +240,7 @@ DEFAULT_WORKLOAD_CONFIG = WorkloadConfig(
     num_tasks=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
     min_computing=(10 ** 7),
     max_computing=(3 * 10 ** 8),
+    # TODO: Compute the task deadline
     min_memory=25 * BYTES_IN_MB,
     max_memory=100 * BYTES_IN_MB,
     min_datasize=51200,  # Each task produces between 50KB and 200KB of data

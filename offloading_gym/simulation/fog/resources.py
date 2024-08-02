@@ -32,7 +32,7 @@ from .config import (
     ResourceGroupConfig,
     ComputingConfig,
     CloudSite,
-    DEFAULT_COMP_CONFIG
+    DEFAULT_COMP_CONFIG,
 )
 
 
@@ -253,13 +253,17 @@ class ResourceManager:
     _simpy_env: simpy.Environment
     _np_random: np.random.Generator
     _config: ComputingConfig
+
     # Each resource group (iot, edge, cloud) has a specific function for
     # creating/returning the resource geolocations
     _coord_fn: Dict[ResourceType, Callable[[GeographicalArea, int], List[Coordinate]]]
+
     _resource_ids: itertools.count
+    _comp_resources: Union[Dict[int, GeolocationResource], None]
     _iot_devices: Union[List[GeolocationResource], None]
     _edge_servers: Union[List[GeolocationResource], None]
     _cloud_servers: Union[List[GeolocationResource], None]
+
     _net_resources: Union[Dict[int, Dict[int, NetworkResource]], None]
 
     def __init__(
@@ -277,38 +281,54 @@ class ResourceManager:
             ResourceType.IOT: self._random_coordinates,
         }
         self._resource_ids = itertools.count(start=0)
+        self._comp_resources = None
         self._iot_devices = None
         self._edge_servers = None
         self._cloud_servers = None
         self._net_resources = None
 
-    def compute_resources(
+    def create_comp_resources(
         self,
-    ) -> Tuple[
-        List[GeolocationResource], List[GeolocationResource], List[GeolocationResource]
-    ]:
+    ) -> Dict[int, GeolocationResource]:
         """
         Returns the compute resources required for the simulation.
 
         Returns:
-            A tuple of three lists containing namely the IoT devices,
-            the edge servers and the cloud servers
+            A dictionary with all the compute resources
         """
+        if self._comp_resources is None:
+            self._iot_devices = self._create_resource_group(ResourceType.IOT)
+            self._edge_servers = self._create_resource_group(ResourceType.EDGE)
+            self._cloud_servers = self._create_resource_group(ResourceType.CLOUD)
+
+            self._comp_resources = {
+                resource.resource_id: resource
+                for resource in self._iot_devices
+                + self._edge_servers
+                + self._cloud_servers
+            }
+
+        return self._comp_resources
+
+    @property
+    def iot_devices(self):
         if self._iot_devices is None:
-            self._create_compute_resources()
-        return self._iot_devices, self._edge_servers, self._cloud_servers
+            self.create_comp_resources()
+        return self._iot_devices
 
-    def _create_compute_resources(
-        self,
-    ) -> Tuple[
-        List[GeolocationResource], List[GeolocationResource], List[GeolocationResource]
-    ]:
-        self._iot_devices = self._create_resource_group(ResourceType.IOT)
-        self._edge_servers = self._create_resource_group(ResourceType.EDGE)
-        self._cloud_servers = self._create_resource_group(ResourceType.CLOUD)
-        return self._iot_devices, self._edge_servers, self._cloud_servers
+    @property
+    def edge_servers(self):
+        if self._edge_servers is None:
+            self.create_comp_resources()
+        return self._edge_servers
 
-    def _create_resource_group(self, resource_type: ResourceType):
+    @property
+    def cloud_servers(self):
+        if self._cloud_servers is None:
+            self.create_comp_resources()
+        return self._cloud_servers
+
+    def _create_resource_group(self, resource_type: ResourceType) -> List[GeolocationResource]:
         """
         Creates the required resources of a given type.
 
@@ -462,8 +482,7 @@ class ComputingEnvironment:
     """
 
     simpy_env: simpy.Environment
-    comp_resources: Dict[int, GeolocationResource]
-    net_resources: Dict[int, Dict[int, NetworkResource]]
+    resource_mgmt: ResourceManager
 
     @staticmethod
     def build(
@@ -491,28 +510,22 @@ class ComputingEnvironment:
             simpy_env = simpy.Environment()
 
         res_mgmt = ResourceManager(simpy_env=simpy_env, np_random=rand, config=config)
+        res_mgmt.create_comp_resources()
 
-        iot_devices, edge_servers, cloud_servers = res_mgmt.compute_resources()
-        resource_dict = {
-            resource.resource_id: resource
-            for resource in iot_devices + edge_servers + cloud_servers
-        }
+        return ComputingEnvironment(simpy_env=simpy_env, resource_mgmt=res_mgmt)
 
-        net_resources = res_mgmt.network_resources()
+    @property
+    def iot_devices(self) -> List[GeolocationResource]:
+        return self.resource_mgmt.iot_devices
 
-        return ComputingEnvironment(
-            simpy_env=simpy_env,
-            comp_resources=resource_dict,
-            net_resources=net_resources,
-        )
+    @property
+    def edge_servers(self) -> List[GeolocationResource]:
+        return self.resource_mgmt.edge_servers
+
+    @property
+    def cloud_servers(self) -> List[GeolocationResource]:
+        return self.resource_mgmt.cloud_servers
 
     def clone(self) -> ComputingEnvironment:
         """Returns a deep copy of the computing environment."""
         return copy.deepcopy(self)
-
-    def _filter_resources_by_type(self, desired_type: ResourceType) -> List[GeolocationResource]:
-        return [v for _, v in self.comp_resources.items() if v.resource_type == desired_type]
-
-    @cached_property
-    def iot_devices(self) -> List[GeolocationResource]:
-        return self._filter_resources_by_type(ResourceType.IOT)
