@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List, Dict, Callable, Optional, Union, Tuple
 from dataclasses import dataclass
 from collections import defaultdict
-from functools import cached_property
+from functools import cache
 
 import math
 import itertools
@@ -259,10 +259,7 @@ class ResourceManager:
     _coord_fn: Dict[ResourceType, Callable[[GeographicalArea, int], List[Coordinate]]]
 
     _resource_ids: itertools.count
-    _comp_resources: Union[Dict[int, GeolocationResource], None]
-    _iot_devices: Union[List[GeolocationResource], None]
-    _edge_servers: Union[List[GeolocationResource], None]
-    _cloud_servers: Union[List[GeolocationResource], None]
+    _comp_resources: Dict[int, GeolocationResource]
 
     _net_resources: Union[Dict[int, Dict[int, NetworkResource]], None]
 
@@ -281,126 +278,32 @@ class ResourceManager:
             ResourceType.IOT: self._random_coordinates,
         }
         self._resource_ids = itertools.count(start=0)
-        self._comp_resources = None
-        self._iot_devices = None
-        self._edge_servers = None
-        self._cloud_servers = None
+        self._comp_resources = {}
         self._net_resources = None
 
-    def create_comp_resources(
-        self,
-    ) -> Dict[int, GeolocationResource]:
+    def compute_resources(self) -> Dict[int, GeolocationResource]:
         """
         Returns the compute resources required for the simulation.
 
         Returns:
             A dictionary with all the compute resources
         """
-        if self._comp_resources is None:
-            self._iot_devices = self._create_resource_group(ResourceType.IOT)
-            self._edge_servers = self._create_resource_group(ResourceType.EDGE)
-            self._cloud_servers = self._create_resource_group(ResourceType.CLOUD)
 
-            self._comp_resources = {
-                resource.resource_id: resource
-                for resource in self._iot_devices
-                + self._edge_servers
-                + self._cloud_servers
-            }
+    def _setup_comp_resources(self):
+        """
+        Returns the compute resources required for the simulation.
+
+        Returns:
+            A dictionary with all the compute resources
+        """
+        if not self._comp_resources:
+            for res_type in [ResourceType.IOT, ResourceType.EDGE, ResourceType.CLOUD]:
+                resources = self._create_resource_group(res_type)
+
+                for res in resources:
+                    self._comp_resources[res.resource_id] = res
 
         return self._comp_resources
-
-    @property
-    def iot_devices(self):
-        if self._iot_devices is None:
-            self.create_comp_resources()
-        return self._iot_devices
-
-    @property
-    def edge_servers(self):
-        if self._edge_servers is None:
-            self.create_comp_resources()
-        return self._edge_servers
-
-    @property
-    def cloud_servers(self):
-        if self._cloud_servers is None:
-            self.create_comp_resources()
-        return self._cloud_servers
-
-    def _create_resource_group(self, resource_type: ResourceType) -> List[GeolocationResource]:
-        """
-        Creates the required resources of a given type.
-
-        Args:
-            resource_type: the type of resource to create (cloud, edge, iot).
-
-        Returns:
-            The list of resources.
-        """
-        config: ResourceGroupConfig = getattr(self._config, f"{resource_type}")
-        get_coordinates = self._coord_fn[resource_type]
-        coordinates = get_coordinates(config.deployment_area, config.num_resources)
-        res_config = config.resource_config
-        resources = []
-        for coord in coordinates:
-            res = GeolocationResource(
-                resource_id=next(self._resource_ids),
-                res_type=resource_type,
-                location=coord,
-                env=self._simpy_env,
-                n_cpu_cores=self._np_random.choice(res_config.cpu_cores),
-                cpu_core_speed=self._np_random.choice(res_config.cpu_core_speed),
-                memory_capacity=self._np_random.choice(res_config.memory),
-            )
-            resources.append(res)
-        return resources
-
-    def network_resources(self) -> Dict[int, Dict[int, NetworkResource]]:
-        """
-        Returns a nested dictionary with the network connectivity between
-        IoT devices and edge and cloud servers.
-
-        Returns:
-            A nested dictionary whose keys are iot device's id
-            and target server's id
-        """
-        if self._net_resources is None:
-            self._create_network_resources()
-        return self._net_resources
-
-    def _create_network_resources(self):
-        self._net_resources = defaultdict()
-        iot_devices, edge_servers, cloud_servers = self.compute_resources()
-        edge_net_conf = self._config.edge.network_config
-        cloud_net_conf = self._config.cloud.network_config
-
-        for iot_device in iot_devices:
-            iot_id = iot_device.resource_id
-            self._net_resources[iot_device.resource_id] = defaultdict()
-
-            for server in edge_servers:
-                bandwidth = self._np_random.uniform(
-                    edge_net_conf.bandwidth.min, edge_net_conf.bandwidth.max
-                )
-                distance = server.euclidean_distance(iot_device)
-                # TODO: Check how to set the latency of edge servers
-                latency = distance
-                self._net_resources[iot_id][server.resource_id] = NetworkResource(
-                    bandwidth=bandwidth, latency=latency
-                )
-
-            for server in cloud_servers:
-                bandwidth = self._np_random.uniform(
-                    cloud_net_conf.bandwidth.min, cloud_net_conf.bandwidth.max
-                )
-                proxy_latency = server.location.latency
-                latency = self._np_random.uniform(proxy_latency.min, proxy_latency.max)
-                self._net_resources[iot_id][server.resource_id] = NetworkResource(
-                    bandwidth=bandwidth, latency=latency
-                )
-
-        return self._net_resources
 
     @staticmethod
     def _grid_coordinates(
@@ -472,6 +375,89 @@ class ResourceManager:
         """
         indices = self._np_random.choice(len(sites), num_locations)
         return [sites[i] for i in indices]
+
+    def _create_resource_group(self, resource_type: ResourceType) -> List[GeolocationResource]:
+        """
+        Creates the required resources of a given type.
+
+        Args:
+            resource_type: the type of resource to create (cloud, edge, iot).
+
+        Returns:
+            The list of resources.
+        """
+        config: ResourceGroupConfig = getattr(self._config, f"{resource_type}")
+        get_coordinates = self._coord_fn[resource_type]
+        coordinates = get_coordinates(config.deployment_area, config.num_resources)
+        res_config = config.resource_config
+        resources = []
+        for coord in coordinates:
+            res = GeolocationResource(
+                resource_id=next(self._resource_ids),
+                res_type=resource_type,
+                location=coord,
+                env=self._simpy_env,
+                n_cpu_cores=self._np_random.choice(res_config.cpu_cores),
+                cpu_core_speed=self._np_random.choice(res_config.cpu_core_speed),
+                memory_capacity=self._np_random.choice(res_config.memory),
+            )
+            resources.append(res)
+        return resources
+
+    @cache
+    def network_resource(self, source_id: int, destination_id: int) -> NetworkResource:
+        """
+        Returns a network resource that represents the
+        bandwidth and latency between two compute resources.
+
+        Args:
+            source_id: the source resource's id
+            destination_id: the destination resource's id'
+
+        Returns:
+            A network resource.
+        """
+        source = self._comp_resources[source_id]
+        destination = self._comp_resources[destination_id]
+
+
+
+
+
+
+    def _create_network_resources(self):
+        self._net_resources = defaultdict()
+        iot_devices, edge_servers, cloud_servers = self.compute_resources()
+        edge_net_conf = self._config.edge.network_config
+        cloud_net_conf = self._config.cloud.network_config
+
+        for iot_device in iot_devices:
+            iot_id = iot_device.resource_id
+            self._net_resources[iot_device.resource_id] = defaultdict()
+
+            for server in edge_servers:
+                bandwidth = self._np_random.uniform(
+                    edge_net_conf.bandwidth.min, edge_net_conf.bandwidth.max
+                )
+                distance = server.euclidean_distance(iot_device)
+                # TODO: Check how to set the latency of edge servers
+                latency = distance
+                self._net_resources[iot_id][server.resource_id] = NetworkResource(
+                    bandwidth=bandwidth, latency=latency
+                )
+
+            for server in cloud_servers:
+                bandwidth = self._np_random.uniform(
+                    cloud_net_conf.bandwidth.min, cloud_net_conf.bandwidth.max
+                )
+                proxy_latency = server.location.latency
+                latency = self._np_random.uniform(proxy_latency.min, proxy_latency.max)
+                self._net_resources[iot_id][server.resource_id] = NetworkResource(
+                    bandwidth=bandwidth, latency=latency
+                )
+
+        return self._net_resources
+
 
 
 @dataclass(frozen=True)
