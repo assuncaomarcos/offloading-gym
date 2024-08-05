@@ -24,3 +24,11 @@ class TestFogEnv(unittest.TestCase):
                 **{},
             )
         env.reset(seed=42)
+
+    def test_execujte_on_iot(self):
+        env = gym.make(
+                "FogPlacement-v0",
+                **{},
+            )
+        env.reset(seed=42)
+        env.step(action=0)

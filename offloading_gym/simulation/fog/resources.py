@@ -8,9 +8,8 @@ scheduling in a fog environment.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Dict, Callable, Optional, Union, Tuple
+from typing import TYPE_CHECKING, List, Dict, Callable, Optional, Union
 from dataclasses import dataclass
-from collections import defaultdict
 from functools import cache
 
 import math
@@ -24,6 +23,8 @@ from simpy.core import BoundClass, Environment, SimTime
 from simpy.exceptions import SimPyException
 from gymnasium.utils import seeding
 
+from offloading_gym.envs.workload import FogTaskAttr
+
 from .config import (
     NetworkConfig,
     Coordinate,
@@ -35,6 +36,9 @@ from .config import (
     CloudSite,
     DEFAULT_COMP_CONFIG,
 )
+
+CYCLES_IN_GHZ = 1_000_000_000
+GIGABIT_IN_BYTES = 1_000_000_000 // 8
 
 
 class ComputeRequest(Request):
@@ -280,8 +284,16 @@ class ResourceManager:
         self._comp_resources = {}
 
     def initialize(self) -> None:
-        """ Initializes the resource manager."""
+        """Initializes the resource manager."""
         self._setup_comp_resources()
+
+    def compute_resources(self) -> Dict[int, GeolocationResource]:
+        """Returns the computing resources"""
+        if not self._comp_resources:
+            raise ResourceWarning("Initialize the resource manager first")
+
+        self._setup_comp_resources()
+        return self._comp_resources
 
     def _setup_comp_resources(self):
         """
@@ -370,7 +382,9 @@ class ResourceManager:
         indices = self._np_random.choice(len(sites), num_locations)
         return [sites[i] for i in indices]
 
-    def _create_resource_group(self, resource_type: ResourceType) -> List[GeolocationResource]:
+    def _create_resource_group(
+        self, resource_type: ResourceType
+    ) -> List[GeolocationResource]:
         """
         Creates the required resources of a given type.
 
@@ -416,10 +430,12 @@ class ResourceManager:
         net_config = self._network_config(destination.resource_type)
 
         if net_config is None:
-            bandwidth = float('inf')
+            bandwidth = float("inf")
             latency = 0
         else:
-            bandwidth = self._np_random.uniform(net_config.bandwidth.min, net_config.bandwidth.max)
+            bandwidth = self._np_random.uniform(
+                net_config.bandwidth.min, net_config.bandwidth.max
+            )
             if destination.resource_type == ResourceType.EDGE:
                 distance_km = source.euclidean_distance(destination)
                 latency = (distance_km * 1000) / net_config.propagation_speed
@@ -476,7 +492,40 @@ class ComputingEnvironment:
 
         res_mgmt = ResourceManager(simpy_env=simpy_env, np_random=rand, config=config)
         res_mgmt.initialize()
-        return ComputingEnvironment(simpy_env=simpy_env, resource_mgmt=res_mgmt, np_random=rand)
+        return ComputingEnvironment(
+            simpy_env=simpy_env, resource_mgmt=res_mgmt, np_random=rand
+        )
+
+    @property
+    def compute_resources(self):
+        return self.resource_mgmt.compute_resources()
+
+    def network_link(self, source_id: int, destination_id: int) -> NetworkResource:
+        return self.resource_mgmt.network_resource(source_id, destination_id)
+
+    @classmethod
+    def task_runtime(cls, resource: GeolocationResource, task: FogTaskAttr) -> float:
+        return task.processing_demand / (resource.cpu_core_speed * CYCLES_IN_GHZ)
+
+    def data_transfer_time(
+        self,
+        source: GeolocationResource,
+        destination: GeolocationResource,
+        num_bytes: int,
+    ):
+        net_link = self.network_link(
+            source_id=source.resource_id, destination_id=destination.resource_id
+        )
+        return num_bytes / (net_link.bandwidth * GIGABIT_IN_BYTES) + net_link.latency
+
+    def energy_use(
+            self,
+            resource: GeolocationResource,
+            task_runtime: float,
+            task_comm_time: float
+    ) -> float:
+        # TODO: Implement the energy consumption
+        return 0
 
     def clone(self) -> ComputingEnvironment:
         """Returns a deep copy of the computing environment."""

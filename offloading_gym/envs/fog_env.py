@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Any, Tuple, Dict, Union, List, Generic, TypeVar, Deque
 from numpy.typing import NDArray
 from collections import deque
+from functools import partial
 
 import gymnasium as gym
 import numpy as np
@@ -44,7 +45,6 @@ FogTaskTuple = Tuple[TaskTuple, FogTaskAttr]
 TASKS_PER_APPLICATION = 20
 MIN_MAX_LATITUDE = (-90, 90)
 MIN_MAX_LONGITUDE = (-180, 180)
-CYCLES_IN_GHZ = 1000000000
 
 # Number of preceding and downstream tasks to consider in the dependency model
 NUM_TASK_PREDECESSORS = 6
@@ -258,10 +258,6 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
             config=self.computing_config,
         )
 
-    def _compute_task_runtime(self, task: TaskAttr) -> float:
-        iot_device = self.computing_env.iot_devices[0]
-        return task.processing_demand / (iot_device.cpu_core_speed * CYCLES_IN_GHZ)
-
     def reset(
         self,
         *,
@@ -274,11 +270,16 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         if not self.computing_env:
             self.computing_env = self._setup_computing_env(seed=seed)
 
+        runtime_on_iot = partial(
+            self.computing_env.task_runtime,
+            self.computing_env.compute_resources.get(0)
+        )
+
         self._simulation = FogSimulation.build(self.computing_env)
 
         # Use only the first task graph
         self.task_graph = self.workload.step(offset=0)[0]
-        self.compute_task_ranks(self.task_graph, self._compute_task_runtime)
+        self.compute_task_ranks(self.task_graph, runtime_on_iot)
 
         topo_order = nx.lexicographical_topological_sort(
             self.task_graph, key=lambda task_id: self.task_graph.nodes[task_id].rank
@@ -300,15 +301,15 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         bool,
         Dict[str, Any],
     ]:
-        task_to_executed = self._task_queue.pop()
-        self._simulation.simulate(tasks=[task_to_executed], target_resources=[action])
+        tasks_execute = self._task_queue.pop()
+        task_info = self._simulation.simulate(tasks=[tasks_execute], target_resources=[action])
 
         #TODO: Compute the reward here...
 
         return self._get_ob(), 0.0, False, False, {}
 
     def _server_embedding(self) -> NDArray[np.float32]:
-        resources = self.computing_env.comp_resources.values()
+        resources = self.computing_env.compute_resources.values()
         server_arrays = [self.server_encoder(resource) for resource in resources]
         return np.stack(server_arrays, axis=0)
 
