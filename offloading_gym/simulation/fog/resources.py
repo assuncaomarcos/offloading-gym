@@ -25,6 +25,7 @@ from simpy.exceptions import SimPyException
 from gymnasium.utils import seeding
 
 from .config import (
+    NetworkConfig,
     Coordinate,
     RectGeographicalArea,
     GeographicalArea,
@@ -261,8 +262,6 @@ class ResourceManager:
     _resource_ids: itertools.count
     _comp_resources: Dict[int, GeolocationResource]
 
-    _net_resources: Union[Dict[int, Dict[int, NetworkResource]], None]
-
     def __init__(
         self,
         simpy_env: simpy.Environment,
@@ -279,15 +278,10 @@ class ResourceManager:
         }
         self._resource_ids = itertools.count(start=0)
         self._comp_resources = {}
-        self._net_resources = None
 
-    def compute_resources(self) -> Dict[int, GeolocationResource]:
-        """
-        Returns the compute resources required for the simulation.
-
-        Returns:
-            A dictionary with all the compute resources
-        """
+    def initialize(self) -> None:
+        """ Initializes the resource manager."""
+        self._setup_comp_resources()
 
     def _setup_comp_resources(self):
         """
@@ -419,45 +413,29 @@ class ResourceManager:
         """
         source = self._comp_resources[source_id]
         destination = self._comp_resources[destination_id]
+        net_config = self._network_config(destination.resource_type)
 
-
-
-
-
-
-    def _create_network_resources(self):
-        self._net_resources = defaultdict()
-        iot_devices, edge_servers, cloud_servers = self.compute_resources()
-        edge_net_conf = self._config.edge.network_config
-        cloud_net_conf = self._config.cloud.network_config
-
-        for iot_device in iot_devices:
-            iot_id = iot_device.resource_id
-            self._net_resources[iot_device.resource_id] = defaultdict()
-
-            for server in edge_servers:
-                bandwidth = self._np_random.uniform(
-                    edge_net_conf.bandwidth.min, edge_net_conf.bandwidth.max
-                )
-                distance = server.euclidean_distance(iot_device)
-                # TODO: Check how to set the latency of edge servers
-                latency = distance
-                self._net_resources[iot_id][server.resource_id] = NetworkResource(
-                    bandwidth=bandwidth, latency=latency
-                )
-
-            for server in cloud_servers:
-                bandwidth = self._np_random.uniform(
-                    cloud_net_conf.bandwidth.min, cloud_net_conf.bandwidth.max
-                )
-                proxy_latency = server.location.latency
+        if net_config is None:
+            bandwidth = float('inf')
+            latency = 0
+        else:
+            bandwidth = self._np_random.uniform(net_config.bandwidth.min, net_config.bandwidth.max)
+            if destination.resource_type == ResourceType.EDGE:
+                distance_km = source.euclidean_distance(destination)
+                latency = (distance_km * 1000) / net_config.propagation_speed
+            else:
+                proxy_latency = destination.location.latency
                 latency = self._np_random.uniform(proxy_latency.min, proxy_latency.max)
-                self._net_resources[iot_id][server.resource_id] = NetworkResource(
-                    bandwidth=bandwidth, latency=latency
-                )
 
-        return self._net_resources
+        return NetworkResource(bandwidth=bandwidth, latency=latency)
 
+    def _network_config(self, dest_type: ResourceType) -> NetworkConfig:
+        if dest_type == ResourceType.EDGE:
+            return self._config.edge.network_config
+        elif dest_type == ResourceType.CLOUD:
+            return self._config.cloud.network_config
+        else:
+            return self._config.iot.network_config
 
 
 @dataclass(frozen=True)
@@ -469,6 +447,7 @@ class ComputingEnvironment:
 
     simpy_env: simpy.Environment
     resource_mgmt: ResourceManager
+    np_random: np.random.Generator
 
     @staticmethod
     def build(
@@ -496,21 +475,8 @@ class ComputingEnvironment:
             simpy_env = simpy.Environment()
 
         res_mgmt = ResourceManager(simpy_env=simpy_env, np_random=rand, config=config)
-        res_mgmt.create_comp_resources()
-
-        return ComputingEnvironment(simpy_env=simpy_env, resource_mgmt=res_mgmt)
-
-    @property
-    def iot_devices(self) -> List[GeolocationResource]:
-        return self.resource_mgmt.iot_devices
-
-    @property
-    def edge_servers(self) -> List[GeolocationResource]:
-        return self.resource_mgmt.edge_servers
-
-    @property
-    def cloud_servers(self) -> List[GeolocationResource]:
-        return self.resource_mgmt.cloud_servers
+        res_mgmt.initialize()
+        return ComputingEnvironment(simpy_env=simpy_env, resource_mgmt=res_mgmt, np_random=rand)
 
     def clone(self) -> ComputingEnvironment:
         """Returns a deep copy of the computing environment."""

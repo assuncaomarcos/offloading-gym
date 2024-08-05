@@ -89,6 +89,8 @@ class NetworkConfig(NamedTuple):
     """Data type for computing network configuration."""
 
     bandwidth: Interval
+    # Propagation speed for the communication medium in m/s
+    propagation_speed: float
 
 
 GeographicalArea = Union[RectGeographicalArea, List[Coordinate]]
@@ -223,7 +225,7 @@ DEFAULT_COMP_CONFIG = ComputingConfig(
         resource_config=ResourceConfig(
             cpu_cores=[4], cpu_core_speed=[1.5, 1.8, 2.0], memory=[1.0, 2.0, 4.0]
         ),
-        network_config=NetworkConfig(bandwidth=Interval(min=10, max=12)),
+        network_config=NetworkConfig(bandwidth=Interval(min=10, max=12), propagation_speed=3 * 10 ** 8),
         deployment_area=MONTREAL_AREA,
     ),
     cloud=ResourceGroupConfig(
@@ -231,7 +233,7 @@ DEFAULT_COMP_CONFIG = ComputingConfig(
         resource_config=ResourceConfig(
             cpu_cores=[8], cpu_core_speed=[2.0, 2.6, 3.0], memory=[16.0, 24.0, 32.0]
         ),
-        network_config=NetworkConfig(bandwidth=Interval(min=4, max=8)),
+        network_config=NetworkConfig(bandwidth=Interval(min=4, max=8), propagation_speed=2.07 * 10 ** 8),
         deployment_area=server_info(),
     ),
 )
