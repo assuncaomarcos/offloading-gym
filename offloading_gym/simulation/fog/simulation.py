@@ -12,7 +12,7 @@ from .resources import ComputingEnvironment, GeolocationResource
 from .config import ResourceType
 
 IOT_DEVICE_ID = 0
-GB_IN_BYTES = 1024 ** 3
+GB_IN_BYTES = 1024**3
 
 
 @dataclass
@@ -64,8 +64,9 @@ class FogSimulation:
             finish_time = self.sim_env.now
             energy = self.comp_env.energy_use(
                 resource=resource,
+                task=task,
                 task_runtime=task_runtime,
-                task_comm_time=upload_delay + download_delay
+                task_comm_time=upload_delay + download_delay,
             )
 
             self.task_info.append(

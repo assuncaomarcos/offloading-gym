@@ -84,6 +84,11 @@ class ComputeResource(Resource):
     """Number of available CPU cores in this resource"""
     _available_memory: float
     """Available memory in GB"""
+    _energy_coefficient: float
+    # Check paper for details on energy model
+    """Energy coefficient for the resource"""
+    _power_idle: float
+    """Idle power consumption in Watts"""
 
     PutQueue = list
     GetQueue = list
@@ -130,6 +135,16 @@ class ComputeResource(Resource):
     def available_memory(self) -> float:
         """Return the available memory in GB"""
         return self._available_memory
+
+    @property
+    def energy_coefficient(self) -> float:
+        """Return the energy coefficient for the resource"""
+        return self._energy_coefficient
+
+    @property
+    def power_idle(self) -> float:
+        """Return the idle power consumption in Watts"""
+        return self._power_idle
 
     if TYPE_CHECKING:
 
@@ -519,13 +534,19 @@ class ComputingEnvironment:
         return num_bytes / (net_link.bandwidth * GIGABIT_IN_BYTES) + net_link.latency
 
     def energy_use(
-            self,
-            resource: GeolocationResource,
-            task_runtime: float,
-            task_comm_time: float
+        self,
+        resource: GeolocationResource,
+        task: FogTaskAttr,
+        task_runtime: float,
+        task_comm_time: float,
     ) -> float:
-        # TODO: Implement the energy consumption
-        return 0
+        processing_energy = (
+            resource.energy_coefficient
+            * task.processing_demand
+            * math.pow(resource.cpu_core_speed, 2)
+        )
+        ready_energy = resource.power_idle * task_comm_time
+        return processing_energy + ready_energy
 
     def clone(self) -> ComputingEnvironment:
         """Returns a deep copy of the computing environment."""

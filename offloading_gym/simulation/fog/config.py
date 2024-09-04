@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Module containing the classes required for building
-the configuration of a fog environment.
+Module containing the classes required for building the configuration of a fog environment.
 
 This module also loads the information on the network latency from Montreal to
 all the other Wonderproxy servers in Canada and the USA to be used for modeling
@@ -23,7 +22,7 @@ from importlib.resources import files
 
 import pandas as pd
 
-BYTES_IN_MB = 2 ** 20
+BYTES_IN_MB = 2**20
 
 
 @dataclass(frozen=True)
@@ -133,7 +132,9 @@ class ComputingConfig:
         Returns:
             The number of compute resources.
         """
-        return self.iot.num_resources + self.edge.num_resources + self.cloud.num_resources
+        return (
+            self.iot.num_resources + self.edge.num_resources + self.cloud.num_resources
+        )
 
     def max_attribute_value(self, attribute: str) -> int:
         """Returns the maximum value of an attribute a resource in the environment has."""
@@ -146,15 +147,15 @@ class ComputingConfig:
 
     def max_number_cores(self) -> int:
         """Returns the maximum number of cores a resource in the environment has."""
-        return self.max_attribute_value('cpu_cores')
+        return self.max_attribute_value("cpu_cores")
 
     def max_core_speed(self) -> int:
         """Returns the maximum speed a compute core in the environment has."""
-        return self.max_attribute_value('cpu_core_speed')
+        return self.max_attribute_value("cpu_core_speed")
 
     def max_memory(self) -> int:
         """Returns the maximum memory size a compute resource in the environment has."""
-        return self.max_attribute_value('memory')
+        return self.max_attribute_value("memory")
 
 
 @dataclass(frozen=True)
@@ -225,7 +226,9 @@ DEFAULT_COMP_CONFIG = ComputingConfig(
         resource_config=ResourceConfig(
             cpu_cores=[4], cpu_core_speed=[1.5, 1.8, 2.0], memory=[1.0, 2.0, 4.0]
         ),
-        network_config=NetworkConfig(bandwidth=Interval(min=10, max=12), propagation_speed=3 * 10 ** 8),
+        network_config=NetworkConfig(
+            bandwidth=Interval(min=10, max=12), propagation_speed=3 * 10**8
+        ),
         deployment_area=MONTREAL_AREA,
     ),
     cloud=ResourceGroupConfig(
@@ -233,15 +236,17 @@ DEFAULT_COMP_CONFIG = ComputingConfig(
         resource_config=ResourceConfig(
             cpu_cores=[8], cpu_core_speed=[2.0, 2.6, 3.0], memory=[16.0, 24.0, 32.0]
         ),
-        network_config=NetworkConfig(bandwidth=Interval(min=4, max=8), propagation_speed=2.07 * 10 ** 8),
+        network_config=NetworkConfig(
+            bandwidth=Interval(min=4, max=8), propagation_speed=2.07 * 10**8
+        ),
         deployment_area=server_info(),
     ),
 )
 
 DEFAULT_WORKLOAD_CONFIG = WorkloadConfig(
     num_tasks=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-    min_computing=(10 ** 7),
-    max_computing=(3 * 10 ** 8),
+    min_computing=(10**7),
+    max_computing=(3 * 10**8),
     # TODO: Compute the task deadline
     min_memory=25 * BYTES_IN_MB,
     max_memory=100 * BYTES_IN_MB,

@@ -12,27 +12,27 @@ class FogTaskAttr(TaskAttr):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self['resource_id'] = -1
+        self["resource_id"] = -1
 
     @property
     def memory(self) -> int:
         """The amount of memory in bytes the task requires."""
-        return self['memory']
+        return self["memory"]
 
     @memory.setter
     def memory(self, value: int) -> None:
         """Set the amount of memory in bytes."""
-        self['memory'] = value
+        self["memory"] = value
 
     @property
     def rank(self) -> float:
         """The task rank."""
-        return self['rank']
+        return self["rank"]
 
     @rank.setter
     def rank(self, value: float) -> None:
         """Set the task rank."""
-        self['rank'] = value
+        self["rank"] = value
 
     @property
     def resource_id(self) -> int:
@@ -40,12 +40,12 @@ class FogTaskAttr(TaskAttr):
         The id of the resource to which the task has been assigned ;
         -1 if unknown.
         """
-        return self['resource_id']
+        return self["resource_id"]
 
     @resource_id.setter
     def resource_id(self, value: int) -> None:
         """Sets the id of the resource to which the task has been assigned"""
-        self['resource_id'] = value
+        self["resource_id"] = value
 
 
 class FogDAGWorkload(RandomDAGGenerator):
@@ -57,7 +57,9 @@ class FogDAGWorkload(RandomDAGGenerator):
         super().__init__(length, **kwargs)
         self.min_memory = kwargs.get("min_memory", 0)
         self.max_memory = kwargs.get("max_memory", 0)
-        assert 0 < self.min_memory <= self.max_memory, "min_memory must > 0.0 and <= max_memory"
+        assert (
+            0 < self.min_memory <= self.max_memory
+        ), "min_memory must > 0.0 and <= max_memory"
         assert 0 < self.max_memory, "max_memory must be > 0"
 
     def random_task_graph(self) -> TaskGraph:
@@ -85,7 +87,3 @@ class FogDAGWorkload(RandomDAGGenerator):
     @staticmethod
     def _build_from_config(args: fog_config.WorkloadConfig):
         return FogDAGWorkload._build_from_dict(args.as_dict())
-
-
-
-

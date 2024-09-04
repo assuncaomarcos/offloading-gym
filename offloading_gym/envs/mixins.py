@@ -13,8 +13,7 @@ class TaskGraphMixin:
 
     @staticmethod
     def compute_task_ranks(
-            task_graph: TaskGraph,
-            task_runtime_fn: Callable[[TaskAttr], float]
+        task_graph: TaskGraph, task_runtime_fn: Callable[[TaskAttr], float]
     ):
         """Computes the task ranks as per the MRLCO/DRLTO papers."""
         successors = task_graph.succ

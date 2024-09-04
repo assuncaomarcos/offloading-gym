@@ -208,8 +208,8 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     workload: FogDAGWorkload
     server_encoder: ServerEncoder
     task_encoder: TaskEncoder
-    computing_config: Union[ComputingConfig, None] = None
-    computing_env: Union[ComputingEnvironment, None] = None
+    compute_config: Union[ComputingConfig, None] = None
+    compute_env: Union[ComputingEnvironment, None] = None
     task_graph: Union[TaskGraph, None] = None  # Current task graph
 
     # To avoid sorting tasks multiple times
@@ -218,11 +218,11 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.computing_config = kwargs.get("computing_config", DEFAULT_COMP_CONFIG)
+        self.compute_config = kwargs.get("compute_config", DEFAULT_COMP_CONFIG)
         self.workload_config = kwargs.get("workload_config", DEFAULT_WORKLOAD_CONFIG)
-        self.server_encoder = ServerEncoder(comp_config=self.computing_config)
+        self.server_encoder = ServerEncoder(comp_config=self.compute_config)
         self.task_encoder = TaskEncoder(
-            comp_config=self.computing_config, workload_config=self.workload_config
+            comp_config=self.compute_config, workload_config=self.workload_config
         )
 
         self.workload = FogDAGWorkload.build(self.workload_config)
@@ -230,9 +230,9 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
 
     def _setup_spaces(self):
         self.action_space = gym.spaces.Discrete(
-            n=self.computing_config.num_compute_resources()
+            n=self.compute_config.num_compute_resources()
         )
-        num_servers = self.computing_config.num_compute_resources()
+        num_servers = self.compute_config.num_compute_resources()
         server_min, server_max = min(self.server_encoder.low), max(
             self.server_encoder.high
         )
@@ -250,12 +250,12 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
             }
         )
 
-    def _setup_computing_env(self, seed: int) -> ComputingEnvironment:
+    def _setup_compute_env(self, seed: int) -> ComputingEnvironment:
         simpy_env = simpy.Environment()
         return ComputingEnvironment.build(
             seed=seed,
             simpy_env=simpy_env,
-            config=self.computing_config,
+            config=self.compute_config,
         )
 
     def reset(
@@ -267,20 +267,21 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         super().reset(seed=seed)
         self.workload.reset(seed=seed)
 
-        if not self.computing_env:
-            self.computing_env = self._setup_computing_env(seed=seed)
+        if not self.compute_env:
+            self.compute_env = self._setup_compute_env(seed=seed)
 
+        # First resource should always be the IoT device
         runtime_on_iot = partial(
-            self.computing_env.task_runtime,
-            self.computing_env.compute_resources.get(0)
+            self.compute_env.task_runtime, self.compute_env.compute_resources.get(0)
         )
 
-        self._simulation = FogSimulation.build(self.computing_env)
+        self._simulation = FogSimulation.build(self.compute_env)
 
-        # Use only the first task graph
+        # Use only the first task graph in this version
         self.task_graph = self.workload.step(offset=0)[0]
         self.compute_task_ranks(self.task_graph, runtime_on_iot)
 
+        # Sorts tasks following their dependencies and ranks
         topo_order = nx.lexicographical_topological_sort(
             self.task_graph, key=lambda task_id: self.task_graph.nodes[task_id].rank
         )
@@ -302,14 +303,16 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         Dict[str, Any],
     ]:
         tasks_execute = self._task_queue.pop()
-        task_info = self._simulation.simulate(tasks=[tasks_execute], target_resources=[action])
+        task_info = self._simulation.simulate(
+            tasks=[tasks_execute], target_resources=[action]
+        )
 
-        #TODO: Compute the reward here...
+        # TODO: Compute the reward here...
 
         return self._get_ob(), 0.0, False, False, {}
 
     def _server_embedding(self) -> NDArray[np.float32]:
-        resources = self.computing_env.compute_resources.values()
+        resources = self.compute_env.compute_resources.values()
         server_arrays = [self.server_encoder(resource) for resource in resources]
         return np.stack(server_arrays, axis=0)
 
@@ -317,7 +320,7 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     def state(self) -> Dict[str, NDArray[np.float32]]:
         return {
             "servers": self._server_embedding(),
-            "task": self.task_encoder((self.task_graph, self.current_task))
+            "task": self.task_encoder((self.task_graph, self.current_task)),
         }
 
     @property
