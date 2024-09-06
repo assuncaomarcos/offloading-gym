@@ -6,16 +6,16 @@
 from gymnasium.envs.registration import register
 from .base import BaseOffEnv
 from .offload_env import BinaryOffloadEnv
-from .fog_env import FogPlacementEnv
+from .fog import FogPlacementEnv
 
 register(
     id="BinaryOffload-v0",
     entry_point="offloading_gym.envs.offload_env:BinaryOffloadEnv",
-    max_episode_steps=100
+    max_episode_steps=100,
 )
 
 register(
     id="FogPlacement-v0",
-    entry_point="offloading_gym.envs.fog_env:FogPlacementEnv",
-    max_episode_steps=100
+    entry_point="offloading_gym.envs.fog:FogPlacementEnv",
+    max_episode_steps=100,
 )

@@ -3,26 +3,41 @@
 
 """
 Module containing the classes required for building the configuration of a fog environment.
-
-This module also loads the information on the network latency from Montreal to
-all the other Wonderproxy servers in Canada and the USA to be used for modeling
-the latency of IoT devices to cloud servers.
-
-More details on the Wonderproxy dataset can be found
-`here <https://wonderproxy.com/blog/a-day-in-the-life-of-the-internet/>`_.
 """
 
 from __future__ import annotations
 
-from typing import List, NamedTuple, Union, AnyStr, Dict, Any
+from typing import (
+    Optional,
+    List,
+    NamedTuple,
+    Union,
+    AnyStr,
+    Dict,
+    Any,
+    Tuple,
+    Type,
+    TYPE_CHECKING,
+)
 from dataclasses import dataclass, asdict
 from enum import Enum
 
-from importlib.resources import files
+if TYPE_CHECKING:
+    from .energy import EnergyModel
 
-import pandas as pd
-
-BYTES_IN_MB = 2**20
+__all__ = [
+    "Coordinate",
+    "RectGeographicalArea",
+    "ResourceType",
+    "ResourceConfig",
+    "Interval",
+    "NetworkConfig",
+    "GeographicalArea",
+    "CloudSite",
+    "ResourceGroupConfig",
+    "ComputingConfig",
+    "WorkloadConfig",
+]
 
 
 @dataclass(frozen=True)
@@ -69,12 +84,17 @@ class ResourceType(Enum):
         return self.value
 
 
+# For specifying a class and its parameters
+ClassWithParams = Tuple[Type[Any], Dict[str, Any]]
+
+
 class ResourceConfig(NamedTuple):
     """Data type for computing resource configuration."""
 
     cpu_cores: List[int]
     cpu_core_speed: List[float]
     memory: List[float]
+    energy_model: Optional[ClassWithParams] = None
 
 
 class Interval(NamedTuple):
@@ -176,85 +196,3 @@ class WorkloadConfig:
     def as_dict(self) -> Dict[AnyStr, Any]:
         """Returns the workload configuration as a dict"""
         return asdict(self)
-
-
-def _load_latency_info() -> List[CloudSite]:
-    with files(__package__).joinpath("latencies.csv").open() as lat_file:
-        df = pd.read_csv(lat_file)
-
-    sites = []
-    for _, row in df.iterrows():
-        site = CloudSite(
-            lat=row["latitude"],
-            long=row["longitude"],
-            title=row["title"],
-            country=row["country"],
-            latency=Interval(min=row["min_latency"], max=row["max_latency"]),
-        )
-        sites.append(site)
-    return sites
-
-
-_server_info = _load_latency_info()
-
-
-def server_info() -> List[CloudSite]:
-    """Returns the latency information as a list of `CloudSite` objects."""
-    return _server_info
-
-
-# The following GPS coordinates roughly encompass the entire
-# city of Montreal, forming a rough rectangular boundary around it.
-MONTREAL_AREA = RectGeographicalArea(
-    northeast=Coordinate(lat=45.7057, long=-73.4746),
-    northwest=Coordinate(lat=45.7057, long=-73.9434),
-    southeast=Coordinate(lat=45.3831, long=-73.4746),
-    southwest=Coordinate(lat=45.3831, long=-73.9434),
-)
-
-DEFAULT_COMP_CONFIG = ComputingConfig(
-    iot=ResourceGroupConfig(
-        num_resources=1,
-        resource_config=ResourceConfig(
-            cpu_cores=[1], cpu_core_speed=[1.0], memory=[1.0]
-        ),
-        network_config=None,
-        deployment_area=MONTREAL_AREA,
-    ),
-    edge=ResourceGroupConfig(
-        num_resources=36,
-        resource_config=ResourceConfig(
-            cpu_cores=[4], cpu_core_speed=[1.5, 1.8, 2.0], memory=[1.0, 2.0, 4.0]
-        ),
-        network_config=NetworkConfig(
-            bandwidth=Interval(min=10, max=12), propagation_speed=3 * 10**8
-        ),
-        deployment_area=MONTREAL_AREA,
-    ),
-    cloud=ResourceGroupConfig(
-        num_resources=20,
-        resource_config=ResourceConfig(
-            cpu_cores=[8], cpu_core_speed=[2.0, 2.6, 3.0], memory=[16.0, 24.0, 32.0]
-        ),
-        network_config=NetworkConfig(
-            bandwidth=Interval(min=4, max=8), propagation_speed=2.07 * 10**8
-        ),
-        deployment_area=server_info(),
-    ),
-)
-
-DEFAULT_WORKLOAD_CONFIG = WorkloadConfig(
-    num_tasks=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-    min_computing=(10**7),
-    max_computing=(3 * 10**8),
-    # TODO: Compute the task deadline
-    min_memory=25 * BYTES_IN_MB,
-    max_memory=100 * BYTES_IN_MB,
-    min_datasize=51200,  # Each task produces between 50KB and 200KB of data
-    max_datasize=204800,
-    density_values=[0.4, 0.5, 0.6, 0.7, 0.8],
-    regularity_values=[0.2, 0.5, 0.8],
-    fat_values=[0.4, 0.5, 0.6, 0.7, 0.8],
-    ccr_values=[0.3, 0.4, 0.5],
-    jump_values=[1, 2],
-)

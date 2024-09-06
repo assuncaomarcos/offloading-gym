@@ -6,10 +6,17 @@ This module provides the classes required to build a discrete event
 simulation of task scheduling on a fog computing environment.
 """
 
-from offloading_gym.simulation.fog.resources import (
-    ComputeResource,
-    ComputeRequest,
+from .simulation import (
+    FogSimulation,
     ComputingEnvironment,
 )
-from offloading_gym.simulation.fog import config
-from offloading_gym.simulation.fog.simulation import FogSimulation, TaskRunInfo
+
+
+__all__ = [
+    "ComputingEnvironment",
+    "FogSimulation",
+    "TaskRunInfo",
+    "energy",
+    "resources",
+    "typing",
+]
