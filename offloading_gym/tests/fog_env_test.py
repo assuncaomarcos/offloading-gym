@@ -20,15 +20,31 @@ class TestFogEnv(unittest.TestCase):
 
     def test_reset_env(self):
         env = gym.make(
-                "FogPlacement-v0",
-                **{},
-            )
+            "FogPlacement-v0",
+            **{},
+        )
         env.reset(seed=42)
 
-    def test_execujte_on_iot(self):
+    def test_execute_on_iot(self):
         env = gym.make(
-                "FogPlacement-v0",
-                **{},
-            )
+            "FogPlacement-v0",
+            **{},
+        )
         env.reset(seed=42)
         env.step(action=0)
+        env.step(action=0)
+
+    def test_random_execution(self):
+        env = gym.make(
+            "FogPlacement-v0",
+            **{},
+        )
+        env.action_space.seed(42)
+        env.reset(seed=42)
+
+        for _ in range(50):
+            action = env.action_space.sample()
+            observation, reward, terminated, truncated, info = env.step(action)
+
+            if terminated or truncated:
+                observation, info = env.reset()

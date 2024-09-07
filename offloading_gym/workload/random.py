@@ -5,7 +5,6 @@ from typing import List, Optional, Dict, Any, Tuple
 from ..task_graph import TaskGraph, TaskAttr, EdgeAttr
 from .daggen import random_dag
 from .base import Workload
-import random
 
 
 class RandomDAGGenerator(Workload):
@@ -49,12 +48,12 @@ class RandomDAGGenerator(Workload):
     def random_daggen_params(self):
         return {
             "rng": self.np_random,
-            "num_tasks": random.choice(self.num_tasks),
-            "density": random.choice(self.densities),
-            "fat": random.choice(self.fat_values),
-            "regularity": random.choice(self.regularities),
-            "ccr": random.choice(self.ccr_values),
-            "jump": random.choice(self.jumps),
+            "num_tasks": self.np_random.choice(self.num_tasks),
+            "density": self.np_random.choice(self.densities),
+            "fat": self.np_random.choice(self.fat_values),
+            "regularity": self.np_random.choice(self.regularities),
+            "ccr": self.np_random.choice(self.ccr_values),
+            "jump": self.np_random.choice(self.jumps),
         }
 
     def step(self, *, offset: Optional[int] = 1) -> List[Optional[TaskGraph]]:

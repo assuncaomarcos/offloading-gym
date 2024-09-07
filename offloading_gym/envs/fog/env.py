@@ -2,8 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-This module provides a gymnasium environment for evaluating the
-placement of task DAGs onto fog resources.
+This module provides a gymnasium environment that simulates a fog 
+infrastructure comprised of mobile device, edge servers and cloud 
+servers. The application is structured as a DAG whose vertices are 
+tasks and edges represente data interdependencies between tasks.
+
+The environment simulates the placement and execution of tasks onto
+the available resources. An action consists of selecting a resource
+onto which the current action will be offloaded.
 """
 
 from abc import ABC, abstractmethod
@@ -43,7 +49,7 @@ from ...simulation.fog.energy import JingEdgeEnergyModel, JingIoTEnergyModel
 FogTaskTuple = Tuple[TaskTuple, FogTaskAttr]
 
 
-BYTES_IN_MB = 2**20
+BYTES_PER_MEGABYTE = 2**20
 
 # The following GPS coordinates roughly encompass the entire
 # city of Montreal, forming a rough rectangular boundary around it.
@@ -107,9 +113,10 @@ DEFAULT_WORKLOAD_CONFIG = WorkloadConfig(
     num_tasks=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
     min_computing=(10**7),
     max_computing=(3 * 10**8),
-    min_memory=25 * BYTES_IN_MB,
-    max_memory=100 * BYTES_IN_MB,
-    min_datasize=51200,  # Each task produces between 50KB and 200KB of data
+    min_memory=25 * BYTES_PER_MEGABYTE,
+    max_memory=100 * BYTES_PER_MEGABYTE,
+    # Each task produces between 50KB and 200KB of data
+    min_datasize=51200,
     max_datasize=204800,
     density_values=[0.4, 0.5, 0.6, 0.7, 0.8],
     regularity_values=[0.2, 0.5, 0.8],
@@ -120,23 +127,53 @@ DEFAULT_WORKLOAD_CONFIG = WorkloadConfig(
 
 
 class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
+    """
+    Implementation of a fog placement environment for task offloading.
+    """
+
+    # An action represents the ID of the resource onto which the current
+    # task being scheduled must execute
     action_space: gym.spaces.Discrete
+
+    # The observation space is a dictionary with two keys: "servers" and "task"
     observation_space: gym.spaces.Dict
     workload: FogDAGWorkload
+
+    # The state of the environment is represented as numpy arrays
+    # using a server and a task encoder.
     server_encoder: ServerEncoder
     task_encoder: TaskEncoder
-    compute_config: Union[ComputingConfig, None] = None
-    compute_env: Union[ComputingEnvironment, None] = None
-    task_graph: Union[TaskGraph, None] = None  # Current task graph
+
+    # The configuration of the environment and the computing environment
+    # used by the discrete event simulation
+    compute_config: Union[ComputingConfig, None]
+    compute_env: Union[ComputingEnvironment, None]
+    _simulation: FogSimulation
+
+    # The task graph produced by the workload generator
+    task_graph: Union[TaskGraph, None]
+    critical_path: List[FogTaskAttr]
 
     # To avoid sorting tasks multiple times
-    _task_queue: Union[Deque[FogTaskAttr], None] = None
-    _simulation: FogSimulation
+    _task_queue: Union[Deque[FogTaskAttr], None]
+    _next_task: Union[FogTaskAttr, None]
+
+    # The weights of latency and energy in the cost function
+    _energy_weight: float
+    _latency_weight: float
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.compute_config = kwargs.get("compute_config", DEFAULT_COMP_CONFIG)
         self.workload_config = kwargs.get("workload_config", DEFAULT_WORKLOAD_CONFIG)
+        self.compute_env = None
+
+        self._latency_weight = kwargs.get("latency_weight", 0.5)
+        self._energy_weight = kwargs.get("energy_weight", 1.0 - self._latency_weight)
+        assert math.isclose(
+            self._latency_weight + self._energy_weight, 1.0
+        ), "The sum of cost and latency weights must be 1.0"
+
         self.server_encoder = ServerEncoder(comp_config=self.compute_config)
         self.task_encoder = TaskEncoder(
             comp_config=self.compute_config, workload_config=self.workload_config
@@ -185,7 +222,8 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         self.workload.reset(seed=seed)
 
         if not self.compute_env:
-            self.compute_env = self._setup_compute_env(seed=seed)
+            random_seed = self.np_random.integers(low=0, high=2**32)
+            self.compute_env = self._setup_compute_env(seed=int(random_seed))
 
         # First resource should always be the IoT device
         runtime_on_iot = partial(
@@ -200,16 +238,20 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
 
         # Sorts tasks following their dependencies and ranks
         topo_order = nx.lexicographical_topological_sort(
-            self.task_graph, key=lambda task_id: self.task_graph.nodes[task_id].rank
+            self.task_graph, key=lambda task_id: -self.task_graph.nodes[task_id].rank
         )
+
+        # Store the application DAG's critical path for later use
+        self.critical_path = nx.dag_longest_path(self.task_graph, weight="rank")
 
         # Store sorted tasks to avoid having to sort it multiple times
         self._task_queue = deque([self.task_graph.nodes[node] for node in topo_order])
+        self._next_task = self._task_queue.popleft()
 
         return self._get_ob(), {}
 
     def _get_ob(self) -> Dict[str, NDArray[np.float32]]:
-        assert self.state is not None, "Call reset before using FogPlacementEnv."
+        assert self._next_task, "Call reset before using FogPlacementEnv."
         return self.state
 
     def step(self, action: int) -> Tuple[
@@ -219,14 +261,39 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         bool,
         Dict[str, Any],
     ]:
-        tasks_execute = self._task_queue.pop()
-        task_info = self._simulation.simulate(
-            tasks=[tasks_execute], target_resources=[action]
+        completed_tasks = self._simulation.simulate(
+            tasks=[self._next_task], target_resources=[action]
         )
 
-        # TODO: Compute the reward here...
+        cost = self._compute_cost(tasks=completed_tasks)
 
-        return self._get_ob(), 0.0, False, False, {}
+        self._next_task = self._task_queue.popleft()
+        observation = self._get_ob()
+
+        truncated = False
+        if len(self._task_queue) == 0:
+            self._next_task = None
+            truncated = True
+
+        return observation, -cost, truncated, False, {}
+
+    def _compute_cost(self, tasks: List[FogTaskAttr]) -> float:
+        cost = 0
+        max_latency = 0
+        max_energy = 0
+
+        for task in tasks:
+            max_latency = max(max_latency, task.makespan)
+            max_energy = max(max_energy, task.energy_used)
+
+        for task in tasks:
+            in_critical_path = 1 if task in self.critical_path else 0
+
+            cost += (self._latency_weight * (task.makespan / max_latency)) + (
+                self._energy_weight * (task.energy_used / max_energy)
+            ) * in_critical_path
+
+        return cost
 
     def _server_embedding(self) -> NDArray[np.float32]:
         resources = self.compute_env.compute_resources.values()
@@ -237,10 +304,5 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
     def state(self) -> Dict[str, NDArray[np.float32]]:
         return {
             "servers": self._server_embedding(),
-            "task": self.task_encoder((self.task_graph, self.current_task)),
+            "task": self.task_encoder((self.task_graph, self._next_task)),
         }
-
-    @property
-    def current_task(self) -> FogTaskAttr:
-        """The current task being scheduled/executed"""
-        return self._task_queue[0]

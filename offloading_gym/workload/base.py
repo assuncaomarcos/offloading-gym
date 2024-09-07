@@ -20,8 +20,7 @@ class Workload(ABC):
     current_time: int
     length: int
     current_element: int
-    _np_random: Union[np.random.Generator, None] = None
-
+    np_random: Union[np.random.Generator, None] = None
     task_attr_factory = TaskAttr
 
     @abstractmethod
@@ -29,6 +28,7 @@ class Workload(ABC):
         self.length = length
         self.current_element = 0
         self.current_time = 0
+        self.np_random = None
 
     @abstractmethod
     def step(self, *, offset: Optional[int] = 1) -> List[Optional[TaskGraph]]:

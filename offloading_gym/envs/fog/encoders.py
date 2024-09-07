@@ -139,18 +139,18 @@ class TaskEncoder(StateEncoder[Tuple[TaskGraph, FogTaskAttr]]):
 
     @classmethod
     def _task_dependencies(cls, task_graph: TaskGraph, task_id: int) -> List[int]:
-        task_predecessors = list(task_graph.pred[task_id].keys())
-        task_predecessors = arrays.pad_list(
-            lst=task_predecessors,
+        pred_ids = list(task_graph.pred[task_id].keys())
+        pred_tasks = [task_graph.tasks[node_id] for node_id in pred_ids]
+
+        pred_ids = arrays.pad_list(
+            lst=pred_ids,
             target_length=NUM_TASK_PREDECESSORS,
             pad_value=-1.0,
         )
 
-        placement_predecessors = [
-            task_attr.resource_id for task_attr in task_graph.predecessors(task_id)
-        ]
-        placement_predecessors = arrays.pad_list(
-            lst=placement_predecessors,
+        placement_pred_tasks = [task.resource_id for task in pred_tasks]
+        placement_pred_tasks = arrays.pad_list(
+            lst=placement_pred_tasks,
             target_length=NUM_PLACEMENT_TASKS,
             pad_value=-1.0,
         )
@@ -160,7 +160,7 @@ class TaskEncoder(StateEncoder[Tuple[TaskGraph, FogTaskAttr]]):
             lst=task_successors, target_length=NUM_TASK_SUCCESSORS, pad_value=-1.0
         )
 
-        return task_predecessors + task_successors + placement_predecessors
+        return pred_ids + task_successors + placement_pred_tasks
 
     def __call__(self, obj: Tuple[TaskGraph, FogTaskAttr]) -> NDArray[np.float32]:
         task_graph, task_attr = obj

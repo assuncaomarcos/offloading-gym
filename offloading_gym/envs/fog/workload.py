@@ -148,7 +148,7 @@ class FogDAGWorkload(RandomDAGGenerator):
     def random_task_graph(self) -> TaskGraph:
         dag = super().random_task_graph()
         rng = self.np_random
-        for node_id, data in dag.nodes.items():
+        for _, data in dag.nodes.items():
             data.memory = rng.integers(self.min_memory, self.max_memory, endpoint=True)
 
         return dag
