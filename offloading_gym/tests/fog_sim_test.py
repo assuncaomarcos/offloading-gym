@@ -17,7 +17,7 @@ class TestSimulation(unittest.TestCase):
             env=self.env,
             n_cpu_cores=CPU_CORES,
             cpu_core_speed=CPU_CORE_FREQUENCY,
-            memory_capacity=MEMORY
+            memory_capacity=MEMORY,
         )
 
     def test_ok_requests(self):
@@ -33,7 +33,9 @@ class TestSimulation(unittest.TestCase):
 
     def test_not_ok_memory(self):
         """Tests a few requests that exceed the maximum amount of memory."""
-        self.env.process(self.execute_task(self.resource, n_cores=CPU_CORES, memory=MEMORY + 0.1))
+        self.env.process(
+            self.execute_task(self.resource, n_cores=CPU_CORES, memory=MEMORY + 0.1)
+        )
         self.assertRaises(simpy.exceptions.SimPyException, self.env.run)
 
     @staticmethod

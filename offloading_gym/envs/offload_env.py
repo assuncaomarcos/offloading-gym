@@ -93,7 +93,7 @@ DEFAULT_CLUSTER_CONFIG = {
 }
 
 DEFAULT_WORKLOAD_CONFIG = {
-    "num_tasks": [20],       # Make sure this is set when using this config
+    "num_tasks": [20],  # Make sure this is set when using this config
     "min_computing": 10**7,  # Each task requires between 10^7 and 10^8 cycles
     "max_computing": 10**8,
     "min_datasize": 5120,  # Each task produces between 5KB and 50KB of data
@@ -207,7 +207,7 @@ class BinaryOffloadEnv(BaseOffEnv):
                 self.tasks_per_app,
                 TASK_PROFILE_LENGTH + TASK_SUCCESSORS + TASK_PREDECESSORS,
             ),
-            dtype=np.float32
+            dtype=np.float32,
         )
 
     def reset(
@@ -241,7 +241,7 @@ class BinaryOffloadEnv(BaseOffEnv):
             task_graph=self.task_graph,
             sorted_tasks=self.task_list,
             task_encoder=self.task_encoder,
-            normalize_ids=self.normalize_task_ids
+            normalize_ids=self.normalize_task_ids,
         )
 
         return self._get_ob(), {}
@@ -264,10 +264,12 @@ class BinaryOffloadEnv(BaseOffEnv):
             self.task_list, action.tolist()
         )
         action_make_span = np.array(
-            [task_execution.make_span for task_execution in action_execution], dtype=np.float32
+            [task_execution.make_span for task_execution in action_execution],
+            dtype=np.float32,
         )
         action_energy = np.array(
-            [task_execution.energy for task_execution in action_execution], dtype=np.float32
+            [task_execution.energy for task_execution in action_execution],
+            dtype=np.float32,
         )
 
         scores_make_span = self._compute_scores(
@@ -291,7 +293,7 @@ class BinaryOffloadEnv(BaseOffEnv):
             {
                 "task_rewards": rewards,
                 "task_energy": action_energy,
-                "task_graph": self.task_graph
+                "task_graph": self.task_graph,
             },
         )
 
@@ -311,13 +313,15 @@ class BinaryOffloadEnv(BaseOffEnv):
     @property
     def local_exec_make_span(self) -> NDArray[np.float32]:
         return np.array(
-            [task_execution.make_span for task_execution in self.local_execution], dtype=np.float32
+            [task_execution.make_span for task_execution in self.local_execution],
+            dtype=np.float32,
         )
 
     @property
     def local_exec_energy(self) -> NDArray[np.float32]:
         return np.array(
-            [task_execution.energy for task_execution in self.local_execution], dtype=np.float32
+            [task_execution.energy for task_execution in self.local_execution],
+            dtype=np.float32,
         )
 
     @property
@@ -363,7 +367,7 @@ class BinaryOffloadEnv(BaseOffEnv):
         task_graph: TaskGraph,
         sorted_tasks: List[TaskTuple],
         task_encoder: Callable[[TaskAttr], List[float]],
-        normalize_ids: bool = True
+        normalize_ids: bool = True,
     ) -> np.ndarray:
         """Creates a list of task embeddings as per the MRLCO/DRLTO papers."""
         task_info = []
@@ -380,7 +384,9 @@ class BinaryOffloadEnv(BaseOffEnv):
                 lst=task_successors, target_length=TASK_SUCCESSORS, pad_value=-1.0
             )
 
-            task_embedding = task_encoder(task_attr) + task_predecessors + task_successors
+            task_embedding = (
+                task_encoder(task_attr) + task_predecessors + task_successors
+            )
             task_info.append(task_embedding)
 
         def normalize_task_ids(dependencies: np.ndarray) -> np.ndarray:

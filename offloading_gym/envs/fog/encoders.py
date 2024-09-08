@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""This module provides classes to encode the state of the Fog environment."""
+
 from .workload import FogTaskAttr
 from offloading_gym.task_graph import TaskGraph
 from offloading_gym.simulation.fog.resources import GeolocatedResource

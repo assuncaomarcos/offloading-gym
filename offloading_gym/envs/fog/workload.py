@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""This module provides the classes required to customize the 
+task dictionaries, adding fog-specific attributes and the fog workload."""
+
 from offloading_gym.workload import RandomDAGGenerator
 from offloading_gym.simulation.fog import typing as fog_config
 from offloading_gym.task_graph import TaskGraph, TaskAttr
