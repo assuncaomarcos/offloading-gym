@@ -1,0 +1,77 @@
+title,country,latitude,longitude,min_latency,max_latency
+Toronto,Canada,43.6481,-79.4042,8.017,49.1766
+Dallas,United States,32.7828,-96.8039,41.05,137.5257
+New York,United States,40.7269,-73.6497,8.664,10.4923
+Boston,United States,42.3583,-71.0603,17.298,77.2911
+Miami,United States,25.765,-80.2,44.0306,50.4408
+Washington,United States,38.9694,-77.3864,22.1494,29.6657
+Atlanta,United States,33.7489,-84.3881,29.4345,30.5736
+Chicago,United States,41.85,-87.65,24.025,26.8972
+San Jose,United States,37.3542,-121.9542,68.8094,73.065
+Seattle,United States,47.6097,-122.3331,57.7108,65.7402
+Fremont,United States,37.5483,-121.9875,66.0184,73.5144
+Los Angeles,United States,34.0522,-118.2428,78.5124,80.652
+Phoenix,United States,33.41,-112.07,59.561,61.2201
+Houston,United States,29.7631,-95.3631,46.746,49.3303
+Baltimore,United States,39.2833,-76.6167,13.9327,20.3205
+San Antonio,United States,29.4239,-98.4933,54.4357,58.8103
+Montreal,Canada,45.5081,-73.555,0.0157,0.097
+Vancouver,Canada,49.2505,-123.1119,55.7954,63.0676
+Kansas City,United States,39.0997,-94.5783,29.7347,31.6378
+Philadelphia,United States,39.9522,-75.1642,11.1727,17.8978
+Denver,United States,39.7392,-104.9842,38.6684,42.3318
+San Diego,United States,32.7153,-117.1564,76.5592,78.8387
+Jacksonville,United States,30.3319,-81.6558,37.2038,38.3296
+Charlotte,United States,35.2269,-80.8433,20.5864,23.139
+Las Vegas,United States,36.08,-115.1522,57.791,59.9202
+Columbus,United States,39.9611,-82.9989,17.446,49.3912
+Detroit,United States,42.3314,-83.0458,23.5378,25.2246
+Portland,United States,45.5236,-122.675,69.2717,71.3405
+Halifax,Canada,44.65,-63.6,15.7814,18.012
+Salt Lake City,United States,40.75,-111.8833,56.5008,57.5724
+Orlando,United States,28.5381,-81.3794,35.9874,37.9667
+St Louis,United States,38.63,-90.2,28.676,46.0593
+Minneapolis,United States,45.5579,-94.1632,34.91,40.7223
+Sacramento,United States,38.5817,-121.4933,79.378,82.2472
+Buffalo,United States,42.8864,-78.8786,15.5,17.9306
+Tampa,United States,27.9472,-82.4586,42.2617,43.8953
+San Francisco,United States,37.775,-122.4183,73.9149,89.3712
+South Bend,United States,41.6833,-86.25,20.222,43.3868
+Green Bay,United States,44.5192,-88.0197,35.1178,38.8496
+Edmonton,Canada,53.6351,-113.6216,52.6104,62.0602
+Monticello,United States,42.2383,-91.1869,26.78,28.3533
+Scranton,United States,41.4089,-75.6628,18.2588,21.9361
+Asheville,United States,35.6008,-82.5542,30.9604,33.3796
+Manhattan,United States,40.7903,-73.9597,10.168,11.7278
+Oklahoma City,United States,35.4822,-97.535,41.0523,42.6993
+Jackson,United States,32.2989,-90.1847,48.422,54.521
+Colorado Springs,United States,38.8633,-104.7919,39.9987,43.4816
+Knoxville,United States,35.9728,-83.9422,46.242,396.053
+Piscataway,United States,40.5456,-74.4608,10.8065,16.8124
+Winnipeg,Canada,49.8994,-97.1392,84.8092,94.9354
+Toledo,United States,41.6656,-83.5753,29.5454,78.3436
+Cincinnati,United States,39.1,-84.5167,27.1696,29.747
+Cleveland,United States,41.6911,-81.3419,36.8554,59.5021
+New Orleans,United States,29.9667,-90.05,51.5008,54.952
+Salem,United States,42.7883,-71.2008,10.196,14.6656
+Albuquerque,United States,35.1107,-106.61,62.2487,138.2556
+Austin,United States,30.25,-97.75,48.089,49.732
+Des Moines,United States,41.5908,-93.6208,32.9554,34.6264
+Albany,United States,42.7469,-73.7589,15.8067,62.609
+Honolulu,United States,21.3,-157.8167,112.1514,123.6665
+Raleigh,United States,35.7789,-78.8003,23.4582,27.2014
+Roseburg,United States,43.2181,-123.3561,65.3162,80.8581
+Saskatoon,Canada,52.1333,-106.6833,41.6804,44.5811
+Secaucus,United States,40.782,-74.0676,12.5217,14.2774
+Brunswick,United States,43.9108,-69.9631,21.0014,23.7594
+Pittsburgh,United States,40.4397,-79.9764,18.0194,34.5459
+Redding,United States,40.5865,-122.3917,93.9114,96.7638
+Indianapolis,United States,39.7684,-86.1581,21.4214,23.1861
+Memphis,United States,35.1495,-90.049,42.681,45.9302
+Cromwell,United States,41.5951,-72.6454,21.256,22.5676
+Syracuse,United States,43.0481,-76.1474,8.94,9.9803
+Savannah,United States,32.0835,-81.0998,65.7401,82.4401
+Quebec City,Canada,46.8139,-71.208,4.004,9.7033
+Berkeley Springs,United States,39.627,-78.2272,20.7158,23.0464
+Ottawa,Canada,45.4215,-75.6972,5.037,6.8138
+Lincoln,United States,40.8258,-96.6852,28.1101,32.4086
