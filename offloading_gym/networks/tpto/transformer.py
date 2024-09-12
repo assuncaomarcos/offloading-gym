@@ -62,77 +62,30 @@ class TransformerBlock(layers.Layer):
         ffn_output = self.dropout2(ffn_output, training=training)
         return self.norm2(out1 + ffn_output)
 
-
 class Encoder(layers.Layer):
-    """
-
-    The Encoder class is a subclass of the layers.Layer class in tensorflow.keras.
-    It is used to implement the encoder part of a transformer model.
-
-    Attributes:
-        - num_heads: (int) the number of attention heads in each transformer block.
-        - key_dim: (int) dimensionality of the query and key vectors in the attention mechanism.
-        - embed_dim: (int) the dimensionality of the input embeddings.
-        - output_dim: (int) the dimensionality of the output embeddings.
-        - ff_dim: (int) the dimensionality of the feed-forward layer output in each transformer block.
-        - num_enc_layers: (int) the number of transformer blocks in the encoder.
-        - dropout: (float) the dropout rate.
-
-    Methods:
-
-        - call(self, inputs, training, mask)
-            Executes the forward pass of the Encoder.
-            Args:
-                - inputs: A tensor containing the input sequence.
-                - training: A boolean representing whether the model is in training mode or not.
-                - mask: A tensor representing the mask used in the attention mechanism.
-            Returns:
-                - action: A tensor representing the output action.
-                - value: A tensor representing the output value.
-    """
-
-    def __init__(
-        self,
-        num_heads,
-        key_dim,
-        embed_dim,
-        output_dim,
-        ff_dim,
-        num_enc_layers=256,
-        dropout=0.0,
-        **kwargs
-    ):
-        """
-            Constructor.
-
-            Args:
-                num_heads: (int) the number of attention heads in each transformer block.
-                key_dim: (int) dimensionality of the query and key vectors in the attention mechanism.
-                embed_dim: (int) the dimensionality of the input embeddings.
-                output_dim: (int) the dimensionality of the output embeddings.
-                ff_dim: (int) the dimensionality of the feed-forward layer output in each transformer block.
-                num_enc_layers: (int) the number of transformer blocks in the encoder.
-                dropout: (float) the dropout rate.
-                **kwargs: Additional keyword arguments.
-        """
+    def __init__(self, num_heads, d_k, d_v, d_model, d_ff, num_enc_layers, dropout, **kwargs):
         super().__init__(**kwargs)
-        self.model_dim = output_dim
 
-        self.input_sequence = tf.keras.Sequential(
+        self.d_model = d_model
+           
+        self.input_sequence_1 = tf.keras.Sequential(
             [
-                layers.Dense(
-                    output_dim, activation="tanh", kernel_initializer="he_normal"
-                ),
-                layers.Dense(
-                    output_dim, activation="tanh", kernel_initializer="he_normal"
-                ),
+                layers.Dense(d_model, activation="tanh", kernel_initializer="he_normal"),
+                layers.Dense(d_model, activation="tanh", kernel_initializer="he_normal"),
+            ]
+        )
+
+        self.input_sequence_2 = tf.keras.Sequential(
+            [
+                layers.Dense(d_model, activation="tanh", kernel_initializer="he_normal"),
+                layers.Dense(d_model, activation="tanh", kernel_initializer="he_normal"),
             ]
         )
 
         self.dropout = layers.Dropout(dropout)
 
         self.encoder_layer = [
-            TransformerBlock(num_heads, key_dim, embed_dim, ff_dim, dropout)
+            TransformerBlock(num_heads, d_model, d_ff, dropout)
             for _ in range(num_enc_layers)
         ]
 
@@ -144,32 +97,37 @@ class Encoder(layers.Layer):
                 layers.Dense(ACTOR_INNER_DIM, kernel_initializer="he_normal"),
                 layers.BatchNormalization(),
                 layers.Activation("tanh"),
-                layers.Dense(
-                    ACTOR_OUTPUT_DIM, activation="tanh", kernel_initializer="he_normal"
-                ),
+                layers.Dense(ACTOR_OUTPUT_DIM, activation="tanh", kernel_initializer="he_normal"),
             ]
         )
 
-        self.critic_layer = layers.Dense(
-            CRITIC_OUTPUT_DIM, kernel_initializer="he_normal"
-        )
-
+        self.critic_layer = layers.Dense(CRITIC_OUTPUT_DIM, kernel_initializer="he_normal")
+        
     def call(self, inputs, training, mask=None):
-        """
-        Args:
-            inputs: (tf.Tensor) the input sequence.
-            training: (bool) indicates whether the model is in training mode or evaluation mode.
-            mask: (tf.Tensor) an optional tensor representing the mask for the input sequence.
+            input_1, input_2 = inputs
 
-        Returns:
-            A tuple of two tensors: action and value.
-        """
-        outputs = self.input_sequence(inputs)
-        for block in self.encoder_layer:
-            outputs = block(outputs, training=training, mask=mask)
-        action = self.actor_layer(outputs)
-        value = self.critic_layer(outputs)
-        return action, value
+            outputs_1 = self.input_sequence_1(input_1)
+            outputs_2 = self.input_sequence_2(input_2)
+            
+            # Expand and tile outputs_2 to match the sequence length of outputs_1
+            batch_size = tf.shape(outputs_1)[0]
+            sequence_length = tf.shape(outputs_1)[1]
+            
+            outputs_2 = tf.expand_dims(outputs_2, axis=1)  # Add sequence dimension
+            outputs_2 = tf.tile(outputs_2, [1, sequence_length, 1])  # Tile to match sequence length
+
+            # Concatenate outputs_1 and outputs_2
+            outputs = tf.concat([outputs_1, outputs_2], axis=-1)
+            
+            # Pass through the Dense layer
+            outputs = tf.keras.layers.Dense(self.d_model, activation='tanh')(outputs)
+
+            for block in self.encoder_layer:
+                outputs = block(outputs, training=training, mask=mask)
+
+            action = self.actor_layer(outputs)
+            value = self.critic_layer(outputs)
+            return action, value
 
 
 keras.utils.get_custom_objects()["Encoder"] = Encoder
