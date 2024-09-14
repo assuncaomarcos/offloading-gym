@@ -21,11 +21,10 @@ from .typing import Coordinate, CloudSite, ResourceType
 from .energy import EnergyModel
 from offloading_gym.envs.fog.workload import FogTaskAttr
 
-
 __all__ = [
+    "NetworkResource",
     "ComputeResource",
-    "GeolocatedResource",
-    "ResourceManager",
+    "GeolocatedResource"
 ]
 
 
@@ -77,11 +76,11 @@ class ComputeResource(Resource):
     GetQueue = list
 
     def __init__(
-        self,
-        env: Environment,
-        n_cpu_cores: int = 1,
-        cpu_core_speed: float = 1,
-        memory_capacity: float = 1,
+            self,
+            env: Environment,
+            n_cpu_cores: int = 1,
+            cpu_core_speed: float = 1,
+            memory_capacity: float = 1,
     ):
         super().__init__(env=env, capacity=n_cpu_cores)
         self._cpu_core_speed = cpu_core_speed
@@ -135,16 +134,16 @@ class ComputeResource(Resource):
 
     def _do_put(self, event: ComputeRequest) -> None:
         if (
-            event.cpu_cores <= self._available_cpu_cores
-            and event.memory <= self._available_memory
+                event.cpu_cores <= self._available_cpu_cores
+                and event.memory <= self._available_memory
         ):
             self._available_memory -= event.memory
             self._available_cpu_cores -= event.cpu_cores
             self.users.append(event)
             event.succeed()
         elif (
-            event.cpu_cores > self.number_of_cores
-            or event.memory > self._memory_capacity
+                event.cpu_cores > self.number_of_cores
+                or event.memory > self._memory_capacity
         ):
             event.fail(SimPyException("Request exceeded maximum capacity"))
 
@@ -180,12 +179,12 @@ class GeolocatedResource(ComputeResource):
     energy_model: Optional[EnergyModel]
 
     def __init__(
-        self,
-        resource_id: int,
-        res_type: ResourceType,
-        location: Coordinate,
-        energy_model: Optional[EnergyModel] = None,
-        **kwargs,
+            self,
+            resource_id: int,
+            res_type: ResourceType,
+            location: Coordinate,
+            energy_model: Optional[EnergyModel] = None,
+            **kwargs,
     ):
         self.resource_id = resource_id
         self.resource_type = res_type

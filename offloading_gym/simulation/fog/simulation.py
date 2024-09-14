@@ -7,7 +7,6 @@ from typing import List, Union
 from dataclasses import dataclass
 from gymnasium.utils import seeding
 from typing import Optional, Callable, Dict
-from .typing import ComputingConfig, ResourceType
 from functools import cache
 
 import simpy
@@ -31,7 +30,7 @@ from .typing import (
 )
 
 IOT_DEVICE_ID = 0
-GB_IN_BYTES = 1024**3
+GB_IN_BYTES = 1024 ** 3
 CYCLES_IN_GHZ = 1_000_000_000
 GIGABIT_IN_BYTES = 1_000_000_000 // 8
 
@@ -54,10 +53,10 @@ class ResourceManager:
     _comp_resources: Dict[int, GeolocatedResource]
 
     def __init__(
-        self,
-        simpy_env: simpy.Environment,
-        np_random: np.random.Generator,
-        config: ComputingConfig,
+            self,
+            simpy_env: simpy.Environment,
+            np_random: np.random.Generator,
+            config: ComputingConfig,
     ):
         self._simpy_env = simpy_env
         self._np_random = np_random
@@ -105,7 +104,7 @@ class ResourceManager:
 
     @staticmethod
     def _grid_coordinates(
-        area: RectGeographicalArea, num_locations: int
+            area: RectGeographicalArea, num_locations: int
     ) -> List[Coordinate]:
         """
         Creates a grid in the provided rectangular geographical area
@@ -133,7 +132,7 @@ class ResourceManager:
         return locations[:num_locations]
 
     def _random_coordinates(
-        self, area: RectGeographicalArea, num_locations: int
+            self, area: RectGeographicalArea, num_locations: int
     ) -> List[Coordinate]:
         """
         Randomly selects geolocations that fall into the provided
@@ -158,7 +157,7 @@ class ResourceManager:
         return locations
 
     def _cloud_coordinates(
-        self, sites: List[CloudSite], num_locations: int
+            self, sites: List[CloudSite], num_locations: int
     ) -> List[CloudSite]:
         """
         Randomly selects geolocations from the list of servers
@@ -175,7 +174,7 @@ class ResourceManager:
         return [sites[i] for i in indices]
 
     def _create_resource_group(
-        self, resource_type: ResourceType
+            self, resource_type: ResourceType
     ) -> List[GeolocatedResource]:
         """
         Creates the required resources of a given type.
@@ -214,7 +213,7 @@ class ResourceManager:
 
         Args:
             source_id: the source resource's id
-            destination_id: the destination resource's id'
+            destination_id: the destination resource's id
 
         Returns:
             A network resource.
@@ -261,10 +260,10 @@ class ComputingEnvironment:
 
     @staticmethod
     def build(
-        *,
-        seed: Optional[int] = None,
-        simpy_env: Optional[simpy.Environment] = None,
-        config: Optional[ComputingConfig] = None,
+            *,
+            seed: Optional[int] = None,
+            simpy_env: Optional[simpy.Environment] = None,
+            config: Optional[ComputingConfig] = None,
     ) -> ComputingEnvironment:
         """
         Builds a computing environment for discrete event simulations.
@@ -302,10 +301,10 @@ class ComputingEnvironment:
         return task.processing_demand / (resource.cpu_core_speed * CYCLES_IN_GHZ)
 
     def data_transfer_time(
-        self,
-        source: GeolocatedResource,
-        destination: GeolocatedResource,
-        num_bytes: int,
+            self,
+            source: GeolocatedResource,
+            destination: GeolocatedResource,
+            num_bytes: int,
     ):
         net_link = self.network_link(
             source_id=source.resource_id, destination_id=destination.resource_id
@@ -365,7 +364,7 @@ class FogSimulation:
             yield self.sim_env.process(self._execute_task(task_attr, resource))
 
     def simulate(
-        self, tasks: List[FogTaskAttr], target_resources: List[int]
+            self, tasks: List[FogTaskAttr], target_resources: List[int]
     ) -> List[FogTaskAttr]:
         sim_env = self.comp_env.simpy_env
         self.simulation_process = sim_env.process(
