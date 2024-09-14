@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 
 import math
 
-
 __all__ = [
+    "EnergyModel",
     "LinearEnergyModel",
     "JingIoTEnergyModel",
     "JingEdgeEnergyModel",
@@ -27,7 +27,7 @@ class EnergyModel(ABC):
 
     @abstractmethod
     def energy_use(
-        self, resource: "GeolocatedResource", task: "FogTaskAttr"
+            self, resource: "GeolocatedResource", task: "FogTaskAttr"
     ) -> float: ...
 
     """ Computes the energy consumed by the resource to execute the task. """
@@ -62,16 +62,16 @@ class JingIoTEnergyModel(EnergyModel):
     energy_coefficient: float
 
     def __init__(
-        self,
-        energy_coefficient: float = math.pow(10, -27),
+            self,
+            energy_coefficient: float = math.pow(10, -27),
     ):
         self.energy_coefficient = energy_coefficient
 
     def energy_use(self, resource: "GeolocatedResource", task: "FogTaskAttr") -> float:
         return (
-            self.energy_coefficient
-            * task.processing_demand
-            * math.pow(resource.cpu_core_speed * resource.number_of_cores, 2)
+                self.energy_coefficient
+                * task.processing_demand
+                * math.pow(resource.cpu_core_speed * resource.number_of_cores, 2)
         )
 
 
