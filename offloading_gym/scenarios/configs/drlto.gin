@@ -1,2 +1,0 @@
-train_eval.num_epochs=100
-train_eval.tasks_per_app=20

@@ -6,6 +6,7 @@ import offloading_gym.utils.arrays as arrays
 class TestUtils(unittest.TestCase):
 
     def test_pad_list(self):
+        """Test list padding"""
         lst = [1, 2, 3, 4, 5]
         padded = arrays.pad_list(lst=lst, target_length=10)
         self.assertEqual(len(padded), 10)
@@ -14,6 +15,7 @@ class TestUtils(unittest.TestCase):
         self.assertListEqual(trimmed, [1, 2, 3])
 
     def test_pad_array(self):
+        """Tests padding Numpy arrays"""
         arr = np.array([1, 2, 3, 4, 5], dtype=np.float32)
         padded = arrays.pad_array(arr=arr, target_length=10, pad_value=-2.0)
         self.assertEqual(len(padded), 10)
@@ -22,6 +24,7 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(np.array_equal(trimmed, np.array([1.0, 2.0, 3.0])))
 
     def test_binary_sequences(self):
+        """Tests binary sequences"""
         length = 4
         seq = arrays.binary_sequences(length)
         self.assertEqual(len(seq), length * length)

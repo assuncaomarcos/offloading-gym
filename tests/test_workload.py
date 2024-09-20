@@ -4,13 +4,11 @@
 
 import unittest
 from offloading_gym.workload import RandomDAGGenerator
-from ..workload import daggen
+from offloading_gym.workload import daggen
 import numpy as np
 
-
 WORKLOAD_CONFIG = {
-    "type": "random_dag",
-    "num_tasks": 20,  # Make sure this is set when using this config
+    "num_tasks": [10, 15, 20, 50],  # Make sure this is set when using this config
     "min_computing": 10**7,  # Each task requires between 10^7 and 10^8 cycles
     "max_computing": 10**8,
     "min_datasize": 5120,  # Each task produces between 5KB and 50KB of data
@@ -22,14 +20,17 @@ WORKLOAD_CONFIG = {
     "jump_values": [1, 2],
 }
 
+RNG_SEED = 42
+
 
 class TestDaggen(unittest.TestCase):
     """Tests the DAG generator."""
 
     def setUp(self) -> None:
-        self.rng = np.random.default_rng(42)
+        self.rng = np.random.default_rng(RNG_SEED)
 
     def test_daggen(self):
+        """Tests generating graph with daggen"""
         task_graph = daggen.random_dag(num_tasks=20)
         pattern = r"DiGraph with \d+ nodes and \d+ edges"
         self.assertRegex(str(task_graph), pattern)
@@ -62,13 +63,26 @@ class TestWorkload(unittest.TestCase):
         self.workload = RandomDAGGenerator(**WORKLOAD_CONFIG)
 
     def test_create_taskgraph(self):
-        task_graph = self.workload.step(offset=1)[0]
-        self.assertEqual(len(task_graph.nodes), self.num_tasks)
+        """Test generating a couple task graphs"""
+        self.workload.reset(seed=RNG_SEED)
+        for _ in range(5):
+            task_graph = self.workload.step(offset=1)[0]
+            self.assertIn(
+                len(task_graph.tasks),
+                self.num_tasks,
+                "Graph does not have a size specified in the config",
+            )
 
-    def test_successors(self):
-        task_graph = self.workload.step(offset=1)[0]
-        successors = task_graph.succ
-        # self.assertEqual(successors[1][2]['datasize'], 809)
+    def test_data_sizes(self):
+        self.workload.reset(seed=RNG_SEED)
+        for _ in range(2):
+            task_graph = self.workload.step(offset=1)[0]
+            for task in task_graph.tasks.values():
+                self.assertTrue(
+                    WORKLOAD_CONFIG["min_datasize"]
+                    <= task.task_size
+                    <= WORKLOAD_CONFIG["max_datasize"]
+                )
 
 
 if __name__ == "__main__":

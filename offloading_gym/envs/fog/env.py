@@ -5,16 +5,14 @@
 This module provides a gymnasium environment that simulates a fog 
 infrastructure comprised of mobile device, edge servers and cloud 
 servers. The application is structured as a DAG whose vertices are 
-tasks and edges represente data interdependencies between tasks.
+tasks and edges represent data interdependencies between tasks.
 
 The environment simulates the placement and execution of tasks onto
 the available resources. An action consists of selecting a resource
 onto which the current action will be offloaded.
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Optional, Any, Tuple, Dict, Union, List, Generic, TypeVar, Deque
+from typing import Optional, Any, Tuple, Dict, Union, List, Deque
 from numpy.typing import NDArray
 from collections import deque
 from functools import partial
@@ -26,104 +24,17 @@ import networkx as nx
 import math
 
 from offloading_gym.simulation.fog import ComputingEnvironment, FogSimulation
-from offloading_gym.simulation.fog.typing import (
-    ComputingConfig,
-    WorkloadConfig,
-    Coordinate,
-    RectGeographicalArea,
-    ResourceConfig,
-    ResourceGroupConfig,
-    NetworkConfig,
-    Interval,
-)
+from offloading_gym.simulation.fog.typing import ComputingConfig
 
 from offloading_gym.task_graph import TaskGraph, TaskTuple
 
 from ..base import BaseOffEnv
 from ..mixins import TaskGraphMixin
 from .workload import FogDAGWorkload, FogTaskAttr
-from .cloud import cloud_sites
 from .encoders import ServerEncoder, TaskEncoder
-from ...simulation.fog.energy import JingEdgeEnergyModel, JingIoTEnergyModel
+from .config import DEFAULT_COMP_CONFIG, DEFAULT_WORKLOAD_CONFIG
 
 FogTaskTuple = Tuple[TaskTuple, FogTaskAttr]
-
-
-BYTES_PER_MEGABYTE = 2**20
-
-# The following GPS coordinates roughly encompass the entire
-# city of Montreal, forming a rough rectangular boundary around it.
-MONTREAL_AREA = RectGeographicalArea(
-    northeast=Coordinate(lat=45.7057, long=-73.4746),
-    northwest=Coordinate(lat=45.7057, long=-73.9434),
-    southeast=Coordinate(lat=45.3831, long=-73.4746),
-    southwest=Coordinate(lat=45.3831, long=-73.9434),
-)
-
-DEFAULT_COMP_CONFIG = ComputingConfig(
-    iot=ResourceGroupConfig(
-        num_resources=1,
-        resource_config=ResourceConfig(
-            cpu_cores=[1],
-            cpu_core_speed=[1.0],
-            memory=[1.0],
-            energy_model=(
-                JingIoTEnergyModel,
-                {"energy_coefficient": math.pow(10, -27)},
-            ),
-        ),
-        network_config=None,
-        deployment_area=MONTREAL_AREA,
-    ),
-    edge=ResourceGroupConfig(
-        num_resources=36,
-        resource_config=ResourceConfig(
-            cpu_cores=[4],
-            cpu_core_speed=[1.5, 1.8, 2.0],
-            memory=[1.0, 2.0, 4.0],
-            energy_model=(
-                JingEdgeEnergyModel,
-                {"energy_per_unit": 9 * math.pow(10, -5)},
-            ),
-        ),
-        network_config=NetworkConfig(
-            bandwidth=Interval(min=10, max=12), propagation_speed=3 * 10**8
-        ),
-        deployment_area=MONTREAL_AREA,
-    ),
-    cloud=ResourceGroupConfig(
-        num_resources=20,
-        resource_config=ResourceConfig(
-            cpu_cores=[8],
-            cpu_core_speed=[2.0, 2.6, 3.0],
-            memory=[16.0, 24.0, 32.0],
-            energy_model=(
-                JingEdgeEnergyModel,
-                {"energy_per_unit": 9 * math.pow(10, -5)},
-            ),
-        ),
-        network_config=NetworkConfig(
-            bandwidth=Interval(min=4, max=8), propagation_speed=2.07 * 10**8
-        ),
-        deployment_area=cloud_sites(),
-    ),
-)
-
-DEFAULT_WORKLOAD_CONFIG = WorkloadConfig(
-    num_tasks=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-    min_computing=(10**7),
-    max_computing=(3 * 10**8),
-    min_memory=25 * BYTES_PER_MEGABYTE,
-    max_memory=100 * BYTES_PER_MEGABYTE,
-    # Each task produces between 50KB and 200KB of data
-    min_datasize=51200,
-    max_datasize=204800,
-    density_values=[0.4, 0.5, 0.6, 0.7, 0.8],
-    regularity_values=[0.2, 0.5, 0.8],
-    fat_values=[0.4, 0.5, 0.6, 0.7, 0.8],
-    ccr_values=[0.3, 0.4, 0.5],
-    jump_values=[1, 2],
-)
 
 
 class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
@@ -213,16 +124,16 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
         )
 
     def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        options: Optional[dict] = None,
+            self,
+            *,
+            seed: Optional[int] = None,
+            options: Optional[dict] = None,
     ) -> Tuple[Dict[str, NDArray[np.float32]], dict[str, Any]]:
         super().reset(seed=seed)
         self.workload.reset(seed=seed)
 
         if not self.compute_env:
-            random_seed = self.np_random.integers(low=0, high=2**32)
+            random_seed = self.np_random.integers(low=0, high=2 ** 32)
             self.compute_env = self._setup_compute_env(seed=int(random_seed))
 
         # First resource should always be the IoT device
@@ -290,7 +201,7 @@ class FogPlacementEnv(BaseOffEnv, TaskGraphMixin):
             in_critical_path = 1 if task in self.critical_path else 0
 
             cost += (self._latency_weight * (task.makespan / max_latency)) + (
-                self._energy_weight * (task.energy_used / max_energy)
+                    self._energy_weight * (task.energy_used / max_energy)
             ) * in_critical_path
 
         return cost

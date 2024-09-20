@@ -61,7 +61,6 @@ from offloading_gym.utils import arrays
 from offloading_gym.workload import Workload
 from offloading_gym.simulation.offload import Cluster, Simulator, TaskExecution
 
-
 __all__ = ["BinaryOffloadEnv"]
 
 TASKS_PER_APPLICATION = 20
@@ -82,9 +81,9 @@ TASK_ID_COLUMNS = [0] + list(
 
 DEFAULT_CLUSTER_CONFIG = {
     "num_edge_cpus": 1,
-    "edge_cpu_capacity": 4 * 10**9,
+    "edge_cpu_capacity": 4 * 10 ** 9,
     "num_local_cpus": 1,
-    "local_cpu_capacity": 10**9,
+    "local_cpu_capacity": 10 ** 9,
     "upload_rate": 11,
     "download_rate": 11,
     "power_tx": 1.258,
@@ -93,9 +92,8 @@ DEFAULT_CLUSTER_CONFIG = {
 }
 
 DEFAULT_WORKLOAD_CONFIG = {
-    "num_tasks": [20],  # Make sure this is set when using this config
-    "min_computing": 10**7,  # Each task requires between 10^7 and 10^8 cycles
-    "max_computing": 10**8,
+    "min_computing": 10 ** 7,  # Each task requires between 10^7 and 10^8 cycles
+    "max_computing": 10 ** 8,
     "min_datasize": 5120,  # Each task produces between 5KB and 50KB of data
     "max_datasize": 51200,
     "density_values": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
@@ -191,7 +189,7 @@ class BinaryOffloadEnv(BaseOffEnv):
 
     def _build_simulation(self, kwargs):
         workload_config = kwargs.get("workload", DEFAULT_WORKLOAD_CONFIG)
-        workload_config["num_tasks"] = self.tasks_per_app
+        workload_config["num_tasks"] = [self.tasks_per_app]
         self.workload = RandomGraphWorkload.build(workload_config)
 
         cluster_config = kwargs.get("cluster", DEFAULT_CLUSTER_CONFIG)
@@ -211,10 +209,10 @@ class BinaryOffloadEnv(BaseOffEnv):
         )
 
     def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        options: Optional[dict] = None,
+            self,
+            *,
+            seed: Optional[int] = None,
+            options: Optional[dict] = None,
     ) -> Tuple[NDArray[np.float32], dict[str, Any]]:
         super().reset(seed=seed)
         self.workload.reset(seed=seed)
@@ -277,11 +275,11 @@ class BinaryOffloadEnv(BaseOffEnv):
         )
         scores_energy = self._compute_scores(action_energy, self.local_exec_energy)
         rewards = (
-            self.weight_latency * scores_make_span + self.weight_energy * scores_energy
+                self.weight_latency * scores_make_span + self.weight_energy * scores_energy
         )
 
         truncate = (
-            self.max_episode_steps is not None and self.steps >= self.max_episode_steps
+                self.max_episode_steps is not None and self.steps >= self.max_episode_steps
         )
 
         return (
@@ -298,9 +296,9 @@ class BinaryOffloadEnv(BaseOffEnv):
         )
 
     def _compute_scores(
-        self,
-        action_results: NDArray[np.float32],
-        local_results: NDArray[np.float32],
+            self,
+            action_results: NDArray[np.float32],
+            local_results: NDArray[np.float32],
     ) -> NDArray[np.float32]:
         avg_local = local_results / float(self.tasks_per_app)
         scores = -(action_results - avg_local) / local_results
@@ -364,10 +362,10 @@ class BinaryOffloadEnv(BaseOffEnv):
 
     @staticmethod
     def _task_embeddings(
-        task_graph: TaskGraph,
-        sorted_tasks: List[TaskTuple],
-        task_encoder: Callable[[TaskAttr], List[float]],
-        normalize_ids: bool = True,
+            task_graph: TaskGraph,
+            sorted_tasks: List[TaskTuple],
+            task_encoder: Callable[[TaskAttr], List[float]],
+            normalize_ids: bool = True,
     ) -> np.ndarray:
         """Creates a list of task embeddings as per the MRLCO/DRLTO papers."""
         task_info = []
@@ -385,7 +383,7 @@ class BinaryOffloadEnv(BaseOffEnv):
             )
 
             task_embedding = (
-                task_encoder(task_attr) + task_predecessors + task_successors
+                    task_encoder(task_attr) + task_predecessors + task_successors
             )
             task_info.append(task_embedding)
 

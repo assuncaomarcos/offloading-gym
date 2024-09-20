@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from typing import List, Optional, Dict, Any, Tuple
-from ..task_graph import TaskGraph, TaskAttr, EdgeAttr
+from ..task_graph import TaskGraph, EdgeAttr
 from .daggen import random_dag
 from .base import Workload
 
@@ -25,12 +25,12 @@ class RandomDAGGenerator(Workload):
         self.jumps = self.list(kwargs, "jump_values")
 
     def min_max(
-        self, parameters: Dict, min_param_name: str, max_param_name: str
+            self, parameters: Dict, min_param_name: str, max_param_name: str
     ) -> Tuple[Any, Any]:
         min_value = self.get_value(parameters, min_param_name)
         max_value = self.get_value(parameters, max_param_name)
         assert (
-            0 <= min_value < max_value
+                0 <= min_value < max_value
         ), f"Unsupported argument {min_value} or {max_value}"
         return min_value, max_value
 

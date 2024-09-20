@@ -1,9 +1,7 @@
 gymnasium>=0.29.1
 numpy>=1.16.3
 networkx>=3.2.1
-black>=24.2.0
 pyglet>=2.0.12
 matplotlib>=3.8.3
 simpy>=4.1.1
-click>=8.1.7
 pandas>=2.2.2

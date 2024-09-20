@@ -11,11 +11,9 @@ from .simulation import (
     ComputingEnvironment,
 )
 
-
 __all__ = [
     "ComputingEnvironment",
     "FogSimulation",
-    "TaskRunInfo",
     "energy",
     "resources",
     "typing",

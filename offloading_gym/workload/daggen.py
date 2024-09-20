@@ -36,7 +36,6 @@ import numpy as np
 
 __all__ = ["random_dag"]
 
-
 # Some sensible default values for DAGs representing IoT applications
 NUM_TASKS = 20
 FAT = 0.7
@@ -46,8 +45,8 @@ JUMP_SIZE = 1
 CCR = 0.3
 MIN_DATA = 5120  # Data sizes of 5KB - 50KB
 MAX_DATA = 51200
-MIN_COMPUTATION = 10**7  # Each task requires between 10^7 and 10^8 cycles
-MAX_COMPUTATION = 10**8
+MIN_COMPUTATION = 10 ** 7  # Each task requires between 10^7 and 10^8 cycles
+MAX_COMPUTATION = 10 ** 8
 
 COST_PRECISION = 4
 
@@ -65,7 +64,7 @@ _rng = np.random.default_rng()
 
 
 def random_int_in_range(
-    rng: np.random.Generator, num: float, range_percent: float
+        rng: np.random.Generator, num: float, range_percent: float
 ) -> int:
     """Generates a random integer within a range around a specified number."""
     r = -range_percent + (2 * range_percent * rng.random())
@@ -73,7 +72,7 @@ def random_int_in_range(
 
 
 def scale_array(
-    input_array: List[float], min_val: float, max_val: float
+        input_array: List[float], min_val: float, max_val: float
 ) -> List[float]:
     np_array = np.array(input_array)
     min_arr = np.amin(np_array)
@@ -83,12 +82,12 @@ def scale_array(
 
 
 def create_tasks(
-    rng: np.random.Generator,
-    n_tasks: int,
-    fat: float,
-    regularity: float,
-    min_comp: int,
-    max_comp: int,
+        rng: np.random.Generator,
+        n_tasks: int,
+        fat: float,
+        regularity: float,
+        min_comp: int,
+        max_comp: int,
 ) -> List[List[TaskInfo]]:
     # Compute the number of tasks per level
     n_tasks_per_level = int(fat * math.sqrt(n_tasks))
@@ -117,7 +116,7 @@ def create_tasks(
 
 
 def create_dependencies(
-    rng: np.random.Generator, tasks: List[List[TaskInfo]], density: float, jump: int
+        rng: np.random.Generator, tasks: List[List[TaskInfo]], density: float, jump: int
 ) -> None:
     n_levels = len(tasks)
 
@@ -155,7 +154,7 @@ def create_dependencies(
 
 
 def set_communication_costs(
-    tasks: List[List[TaskInfo]], ccr: float, min_data: int, max_data: int
+        tasks: List[List[TaskInfo]], ccr: float, min_data: int, max_data: int
 ) -> None:
     # To compute the CCR the original model has communication costs associated to edges,
     # but to reproduce the results of the MRLCO paper, we consider all tasks here since the result of
@@ -198,18 +197,18 @@ def create_task_graph(task_info: List[List[TaskInfo]]) -> DiGraph:
 
 
 def random_dag(
-    *,
-    rng: Optional[np.random.Generator] = None,
-    num_tasks: Optional[int] = NUM_TASKS,
-    fat: Optional[float] = FAT,
-    density: Optional[float] = DENSITY,
-    regularity: Optional[float] = REGULARITY,
-    jump: Optional[int] = JUMP_SIZE,
-    ccr: Optional[float] = CCR,
-    min_comp: Optional[int] = MIN_COMPUTATION,
-    max_comp: Optional[int] = MAX_COMPUTATION,
-    min_data: Optional[int] = MIN_DATA,
-    max_data: Optional[int] = MAX_DATA,
+        *,
+        rng: Optional[np.random.Generator] = None,
+        num_tasks: Optional[int] = NUM_TASKS,
+        fat: Optional[float] = FAT,
+        density: Optional[float] = DENSITY,
+        regularity: Optional[float] = REGULARITY,
+        jump: Optional[int] = JUMP_SIZE,
+        ccr: Optional[float] = CCR,
+        min_comp: Optional[int] = MIN_COMPUTATION,
+        max_comp: Optional[int] = MAX_COMPUTATION,
+        min_data: Optional[int] = MIN_DATA,
+        max_data: Optional[int] = MAX_DATA,
 ) -> DiGraph:
     """Generates a random task DAG.
 
@@ -240,10 +239,10 @@ def random_dag(
     assert 0 <= ccr <= 10, "ccr must be between 0 and 10"
     assert 1 <= jump <= 4, "jump_size must be between 1 and 4"
     assert (
-        0 <= min_comp <= max_comp
+            0 <= min_comp <= max_comp
     ), "min_comp must be smaller than max_comp, and both must be greater than 0"
     assert (
-        0 <= min_data <= max_data
+            0 <= min_data <= max_data
     ), "min_data must be smaller than max_data, and both must be greater than 0"
 
     if rng is None:
