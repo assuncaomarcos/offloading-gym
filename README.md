@@ -52,7 +52,7 @@ focuses on the placement and execution of tasks onto available resources. Action
 which resource (mobile device, edge server, or cloud server) will execute the current task. This is an extended version
 of the environment used in:
 
-- Goudarzi, Mohammad et al. "$\mu$-DDRL: A QoS-Aware Distributed Deep Reinforcement Learning Technique for Service
+- Goudarzi, Mohammad et al. "μ-DDRL: A QoS-Aware Distributed Deep Reinforcement Learning Technique for Service
   Offloading in Fog Computing Environments." *IEEE Transactions on Services Computing*, vol. 17, no. 1, pp. 47-59, 2024.
 
 ## Usage
