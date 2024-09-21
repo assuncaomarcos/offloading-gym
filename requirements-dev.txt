@@ -1,2 +1,6 @@
 black>=24.2.0
 requests>=2.32.3
+setuptools>=75.1.0
+wheel>=0.44.0
+coverage>=7.6.1
+build>=1.2.2

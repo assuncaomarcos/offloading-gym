@@ -1,0 +1,67 @@
+# Check the link below for information on this file
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["offloading_gym*"]
+exclude = ["data*"]
+
+[project]
+name = "offloading-gym"
+authors = [
+    { name = "Marcos Dias de Assuncao", email = "assuncao@acm.org" }
+]
+description = "Task Offloading Simulation Environments"
+readme = "README.md"
+requires-python = ">=3.7, <4"
+license = { text = "MIT" }
+keywords = ["reinforcement learning", "task offloading", "simulation", "gymnasium"]
+maintainers = [
+    { name = "Marcos Dias de Assuncao", email = "assuncao@acm.org" }
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Simulation",
+    "Topic :: Software Development :: Libraries",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "Operating System :: MacOS",
+    "Topic :: Utilities"
+]
+dynamic = ["version"]
+dependencies = [
+    "gymnasium>=0.29.1",
+    "numpy>=1.16.3",
+    "networkx>=3.2.1",
+    "pyglet>=2.0.12",
+    "matplotlib>=3.8.3",
+    "simpy>=4.1.1",
+    "pandas>=2.2.2"
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "offloading_gym.__version__" }
+
+[project.optional-dependencies]
+dev = ["coverage>=5.3", "black", "build"]
+#docs = ["Sphinx", "docutils", "nbsphinx"]
+test = ["coverage"]
+
+[project.urls]
+"Homepage" = "https://github.com/assuncaomarcos/offloading-gym"
+"Bug Reports" = "https://github.com/assuncaomarcos/offloading-gym"
+"Say Thanks!" = "https://saythanks.io/to/assuncaomarcos"
+"Source" = "https://github.com/assuncaomarcos/offloading-gym"
+#documentation = "http://offloading-gym.readthedocs.io/"
