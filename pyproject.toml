@@ -4,6 +4,9 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+package-data = { "offloading_gym.envs.fog" = ["*.csv"] }
+
 [tool.setuptools.packages.find]
 include = ["offloading_gym*"]
 exclude = ["data*"]
@@ -62,6 +65,5 @@ test = ["coverage"]
 [project.urls]
 "Homepage" = "https://github.com/assuncaomarcos/offloading-gym"
 "Bug Reports" = "https://github.com/assuncaomarcos/offloading-gym"
-"Say Thanks!" = "https://saythanks.io/to/assuncaomarcos"
 "Source" = "https://github.com/assuncaomarcos/offloading-gym"
 #documentation = "http://offloading-gym.readthedocs.io/"
